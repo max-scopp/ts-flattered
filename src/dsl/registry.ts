@@ -17,9 +17,14 @@ export interface SymbolRegistration {
   isTypeOnly?: boolean;
 }
 
+export interface SymbolRegistrationOptions {
+  importType?: "named" | "default" | "namespace";
+  isTypeOnly?: boolean;
+}
+
 export class Registry {
   private files: TsFlatteredFile[] = [];
-  private symbols: Map<string, SymbolRegistration> = new Map(); // symbolName -> registration info
+  private symbols: Map<string, SymbolRegistration> = new Map();
   public readonly project: Project;
 
   constructor(project?: Project) {
@@ -48,7 +53,7 @@ export class Registry {
 
   push(file: TsFlatteredFile) {
     this.files.push(file);
-    // register exported classes automatically
+    // Register exported classes automatically
     for (const stmt of file.statements) {
       const exportedSymbols = stmt.getExportedSymbols();
       for (const symbol of exportedSymbols) {
@@ -57,35 +62,16 @@ export class Registry {
     }
   }
 
-  registerSymbol(symbol: string, filePath: string): void;
-  registerSymbol(symbol: string, registration: SymbolRegistration): void;
   registerSymbol(
     symbol: string,
     filePath: string,
-    options: {
-      importType?: "named" | "default" | "namespace";
-      isTypeOnly?: boolean;
-    },
-  ): void;
-  registerSymbol(
-    symbol: string,
-    filePathOrRegistration: string | SymbolRegistration,
-    options?: {
-      importType?: "named" | "default" | "namespace";
-      isTypeOnly?: boolean;
-    },
+    options: SymbolRegistrationOptions = {},
   ): void {
-    let registration: SymbolRegistration;
-
-    if (typeof filePathOrRegistration === "string") {
-      registration = {
-        filePath: filePathOrRegistration,
-        importType: options?.importType || "named",
-        isTypeOnly: options?.isTypeOnly || false,
-      };
-    } else {
-      registration = filePathOrRegistration;
-    }
+    const registration: SymbolRegistration = {
+      filePath,
+      importType: options.importType || "named",
+      isTypeOnly: options.isTypeOnly || false,
+    };
 
     this.symbols.set(symbol, registration);
   }

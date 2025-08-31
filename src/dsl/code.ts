@@ -1,6 +1,6 @@
 type TemplateValue = string | number | boolean | null | undefined;
 
-interface SourceLocation {
+export interface SourceLocation {
   file: string;
   line: number;
   column: number;
@@ -12,7 +12,10 @@ interface CodeBlock {
   source: SourceLocation;
 }
 
-// Global registry for source mapping
+/**
+ * Simple source mapping registry for tracking code blocks
+ * Provides basic source-to-generated code mapping capabilities
+ */
 class SourceMapRegistry {
   private codeBlocks = new Map<string, CodeBlock>();
   private nextId = 1;
@@ -27,25 +30,6 @@ class SourceMapRegistry {
     return this.codeBlocks.get(id)?.source;
   }
 
-  findBlockByGeneratedLine(
-    _generatedFile: string,
-    _generatedLine: number,
-  ): CodeBlock | undefined {
-    // This would be used to map from generated line numbers back to source
-    // For now, we'll implement a simple approach based on comments
-    for (const block of this.codeBlocks.values()) {
-      // This is a simplified mapping - in practice, you'd need more sophisticated line tracking
-      if (block.content.includes(`/* ${block.id} */`)) {
-        return block;
-      }
-    }
-    return undefined;
-  }
-
-  getAllBlocks(): CodeBlock[] {
-    return Array.from(this.codeBlocks.values());
-  }
-
   clear(): void {
     this.codeBlocks.clear();
     this.nextId = 1;
@@ -54,38 +38,46 @@ class SourceMapRegistry {
 
 export const sourceMapRegistry = new SourceMapRegistry();
 
+/**
+ * Simple stack trace parser to get call site information
+ * Returns basic file location or defaults for error cases
+ */
 function getCallSite(): SourceLocation {
-  const stack = new Error().stack;
-  if (!stack) {
-    return { file: "unknown", line: 0, column: 0 };
-  }
+  const DEFAULT_LOCATION: SourceLocation = {
+    file: "unknown",
+    line: 0,
+    column: 0,
+  };
 
-  // Split stack trace into lines and find the caller (skip Error, getCallSite, and code function)
-  const lines = stack.split("\n");
-  const callerLine = lines[3]; // lines[0] = Error, lines[1] = getCallSite, lines[2] = code function, lines[3] = actual caller
+  try {
+    const stack = new Error().stack;
+    if (!stack) return DEFAULT_LOCATION;
 
-  if (!callerLine) {
-    return { file: "unknown", line: 0, column: 0 };
-  }
+    const lines = stack.split("\n");
+    const callerLine = lines[3]; // Skip Error, getCallSite, and code function
+    if (!callerLine) return DEFAULT_LOCATION;
 
-  // Extract file path, line, and column from stack trace
-  // Stack trace format varies, but typically: "at function (file:line:column)" or "at file:line:column"
-  const match =
-    callerLine.match(/\(([^:]+):(\d+):(\d+)\)/) ||
-    callerLine.match(/at ([^:]+):(\d+):(\d+)/);
+    const match =
+      callerLine.match(/\(([^:]+):(\d+):(\d+)\)/) ||
+      callerLine.match(/at ([^:]+):(\d+):(\d+)/);
 
-  if (match) {
+    if (!match) return DEFAULT_LOCATION;
+
     const [, file, line, column] = match;
     return {
-      file: (file?.split("/").pop() ?? file) || "unknown",
+      file: file?.split("/").pop() || "unknown",
       line: line ? parseInt(line, 10) : 0,
       column: column ? parseInt(column, 10) : 0,
     };
+  } catch {
+    return DEFAULT_LOCATION;
   }
-
-  return { file: "unknown", line: 0, column: 0 };
 }
 
+/**
+ * Template literal function for creating trackable code blocks
+ * Automatically registers source mapping information
+ */
 export function code(
   strings: TemplateStringsArray,
   ...values: TemplateValue[]
@@ -94,48 +86,40 @@ export function code(
     (acc, str, i) => acc + str + (values[i] ?? ""),
     "",
   );
-  const source = getCallSite();
 
-  // Register this code block and get its ID
+  const source = getCallSite();
   const blockId = sourceMapRegistry.register(content, source);
 
-  // Return the content with a source map comment
   return `/* ${blockId} */ ${content}`;
 }
 
-// Helper function to extract code block ID from generated content
-export function extractCodeBlockId(
+/**
+ * Extract code block ID from generated content near a specific line
+ */
+function extractCodeBlockId(
   generatedContent: string,
   lineNumber: number,
 ): string | undefined {
   const lines = generatedContent.split("\n");
-  const line = lines[lineNumber - 1]; // Convert to 0-based index
+  const startLine = Math.max(0, lineNumber - 3);
+  const endLine = Math.min(lines.length, lineNumber + 2);
 
-  if (!line) return undefined;
-
-  // Look for the source map comment pattern in current line and nearby lines
-  for (
-    let i = Math.max(0, lineNumber - 3);
-    i < Math.min(lines.length, lineNumber + 2);
-    i++
-  ) {
-    const searchLine = lines[i];
-    const match = searchLine?.match(/\/\*\s*(tscb:\d+)\s*\*\//);
-    if (match) {
-      return match[1];
-    }
+  for (let i = startLine; i < endLine; i++) {
+    const line = lines[i];
+    const match = line?.match(/\/\*\s*(tscb:\d+)\s*\*\//);
+    if (match) return match[1];
   }
 
   return undefined;
 }
 
-// Map a diagnostic back to its original source location
+/**
+ * Map a diagnostic back to its original source location
+ */
 export function mapDiagnosticToSource(
   generatedContent: string,
   generatedLine: number,
 ): SourceLocation | undefined {
   const blockId = extractCodeBlockId(generatedContent, generatedLine);
-  if (!blockId) return undefined;
-
-  return sourceMapRegistry.getSourceLocation(blockId);
+  return blockId ? sourceMapRegistry.getSourceLocation(blockId) : undefined;
 }

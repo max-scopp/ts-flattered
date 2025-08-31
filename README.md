@@ -1,127 +1,203 @@
 # ts-flattered
 
-> A optionated, hybrid DSL for generating TypeScript code.
+> A lightweight DSL for programmatically generating TypeScript code with automatic import resolution.
 
-## ✅ Features
+## What it does
 
-* **Hybrid DSL**: structured nodes + arbitrary code blocks
-* **Automatic imports**: symbols resolved from registry
-* **Local vs global registries**: isolation for experimental or modular code
+Generate TypeScript files programmatically using a simple, chainable API. Automatically resolves imports between generated files based on symbol usage.
 
-## 🛠 Core Concepts
-
-### 1. DSL Nodes
-
-| Node                                  | Description                                                      |
-| ------------------------------------- | ---------------------------------------------------------------- |
-| `sourceFile(name, statements, opts?)` | Creates a file with statements and optional registry             |
-| `cls(name, members, decorators?)`     | Creates a class with members and optional decorators             |
-| `method(opts)`                        | Creates a method; accepts `name`, `params`, `returnType`, `body` |
-| `param(name, type)`                   | Creates a parameter for a method                                 |
-| `decorator(name)`                     | Adds a decorator to a class or method                            |
-| `code`                                | Template literal escape hatch for arbitrary code                 |
-
----
-
-### 2. Registry
-
-* Tracks files and exported symbols
-* Resolves imports **automatically** from parameter types, return types, or registered symbols
-* Supports **global registry** (`registry`) or **local per-file registry**
-
-**API:**
+## Quick Example
 
 ```ts
-registry.push(file)          // Add a file
-registry.addImport(fileName, importStr) // Explicit import if needed
-registry.resolveSymbol(name) // Returns file path or undefined
-registry.getFiles()          // List of registered files
-```
+import { cls, method, param, code, sourceFile, writeAll } from "ts-flattered";
 
----
-
-## ⚡ Example: Global Registry
-
-```ts
-import { cls, method, param, code, sourceFile, registry } from "./dsl";
-
-// Dog file
-const dogFile = sourceFile("Dog.ts", [
+// Create files with classes
+sourceFile("Dog.ts", [
   cls("Dog", [
-    method({ name: "bark", returnType: "void", body: code`console.log("Woof!")` })
-  ])
-]);
-registry.push(dogFile);
-
-// PetStore file
-const petStoreFile = sourceFile("PetStore.ts", [
-  cls("PetStore", [
     method({
-      name: "getDogs",
-      params: [param("opt1", "Dog[]")],
-      returnType: "void",
-      body: code`for (const dog of opt1) dog.bark();`
+      name: "bark",
+      body: code`console.log("Woof!")`
     })
   ])
 ]);
-registry.push(petStoreFile);
 
-// Render PetStore
-console.log(petStoreFile.render());
+sourceFile("PetStore.ts", [
+  cls("PetStore", [
+    method({
+      name: "getDogs",
+      params: [param("dogs", "Dog[]")], // Auto-imports Dog from Dog.ts
+      body: code`dogs.forEach(dog => dog.bark())`
+    })
+  ])
+]);
+
+// Generate all files
+await writeAll({ outputDir: "./generated" });
 ```
 
-**Output:**
+## Core API
+
+- **`sourceFile(name, statements)`** - Create a TypeScript file
+- **`cls(name, members)`** - Create a class with methods
+- **`method(opts)`** - Create a method with params, return type, body
+- **`param(name, type)`** - Method parameter
+- **`code`literals`** - Template literal for arbitrary TypeScript code
+- **`writeAll(opts)`** - Generate all files to disk
+
+## Features
+
+✅ **Auto-import resolution** - References between files handled automatically  
+✅ **Barrel exports** - Generate index files that re-export everything  
+✅ **Source mapping** - Map generated code back to DSL calls for debugging  
+✅ **TypeScript diagnostics** - Get compile errors with original source locations  
+
+## Before vs After
+
+### Using raw TypeScript Compiler API
 
 ```ts
-import { Dog } from "./Dog";
+import * as ts from "typescript";
+import * as fs from "fs";
 
-class PetStore {
-getDogs(opt1: Dog[]): void {
-for (const dog of opt1) dog.bark();
-}
-}
+// Create Dog.ts
+const dogClassDeclaration = ts.factory.createClassDeclaration(
+  [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+  "Dog",
+  undefined,
+  undefined,
+  [
+    ts.factory.createMethodDeclaration(
+      undefined,
+      undefined,
+      "bark",
+      undefined,
+      undefined,
+      [],
+      ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+      ts.factory.createBlock([
+        ts.factory.createExpressionStatement(
+          ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier("console"),
+              "log"
+            ),
+            undefined,
+            [ts.factory.createStringLiteral("Woof!")]
+          )
+        )
+      ])
+    )
+  ]
+);
+
+const dogSourceFile = ts.factory.createSourceFile(
+  [dogClassDeclaration],
+  ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+  ts.NodeFlags.None
+);
+
+// Create PetStore.ts with manual import
+const importDeclaration = ts.factory.createImportDeclaration(
+  undefined,
+  ts.factory.createImportClause(
+    false,
+    undefined,
+    ts.factory.createNamedImports([
+      ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("Dog"))
+    ])
+  ),
+  ts.factory.createStringLiteral("./Dog"),
+  undefined
+);
+
+const petStoreMethod = ts.factory.createMethodDeclaration(
+  undefined,
+  undefined,
+  "getDogs",
+  undefined,
+  undefined,
+  [
+    ts.factory.createParameterDeclaration(
+      undefined,
+      undefined,
+      "dogs",
+      undefined,
+      ts.factory.createArrayTypeNode(ts.factory.createTypeReferenceNode("Dog"))
+    )
+  ],
+  ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+  ts.factory.createBlock([
+    ts.factory.createExpressionStatement(
+      ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+          ts.factory.createIdentifier("dogs"),
+          "forEach"
+        ),
+        undefined,
+        [
+          ts.factory.createArrowFunction(
+            undefined,
+            undefined,
+            [ts.factory.createParameterDeclaration(undefined, undefined, "dog")],
+            undefined,
+            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier("dog"),
+                "bark"
+              ),
+              undefined,
+              []
+            )
+          )
+        ]
+      )
+    )
+  ])
+);
+
+const petStoreClass = ts.factory.createClassDeclaration(
+  [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
+  "PetStore",
+  undefined,
+  undefined,
+  [petStoreMethod]
+);
+
+const petStoreSourceFile = ts.factory.createSourceFile(
+  [importDeclaration, petStoreClass],
+  ts.factory.createToken(ts.SyntaxKind.EndOfFileToken),
+  ts.NodeFlags.None
+);
+
+// Print and write files
+const printer = ts.createPrinter();
+fs.writeFileSync("Dog.ts", printer.printFile(dogSourceFile));
+fs.writeFileSync("PetStore.ts", printer.printFile(petStoreSourceFile));
 ```
 
----
-
-## ⚡ Example: Local Registry
+### Using ts-flattered
 
 ```ts
-import { Registry } from "./dsl/registry";
+import { cls, method, param, code, sourceFile, writeAll } from "ts-flattered";
 
-const localRegistry = new Registry();
+sourceFile("Dog.ts", [
+  cls("Dog", [
+    method({ name: "bark", body: code`console.log("Woof!")` })
+  ])
+]);
 
-const dogFile = sourceFile("Dog.ts", [ cls("Dog", [ method({ name: "bark", returnType: "void", body: code`console.log("Woof!")` }) ]) ], { registry: localRegistry });
-localRegistry.push(dogFile);
+sourceFile("PetStore.ts", [
+  cls("PetStore", [
+    method({
+      name: "getDogs",
+      params: [param("dogs", "Dog[]")], // Auto-imports Dog
+      body: code`dogs.forEach(dog => dog.bark())`
+    })
+  ])
+]);
 
-const petStoreFile = sourceFile("PetStore.ts", [ cls("PetStore", [ method({ name: "getDogs", params: [param("opt1","Dog[]")], returnType:"void", body: code`for(const dog of opt1) dog.bark();` }) ]) ], { registry: localRegistry });
-localRegistry.push(petStoreFile);
-
-console.log(petStoreFile.render());
+await writeAll({ outputDir: "./generated" });
 ```
 
-* Fully **isolated imports**
-* Symbols only visible in this registry
-* Global registry unaffected
-
----
-
-## 🎛 Plugin System
-
-* Plugins receive a registry (global or local)
-* Can push files, add methods, decorators, or modify existing classes
-* Works seamlessly with auto-imports
-
-```ts
-export function dogPlugin(registry) {
-  const catMethod = method({
-    name: "countDogs",
-    params: [param("dogs", "Dog[]")],
-    returnType: "number",
-    body: code`return dogs.length;`
-  });
-
-  const file = registry.getFiles().find(f => f.name === "PetStore.ts");
-  file.addStatement(cls("PetStore", [catMethod]));
-}
-```
+**90% less code + automatic import resolution + actually readable**

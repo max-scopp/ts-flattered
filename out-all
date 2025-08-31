@@ -1,0 +1,8 @@
+#! /usr/bin/env sh
+
+rm -r out/
+bun examples/basic.ts
+bun examples/param-flags.ts
+bun examples/test-auto-import.ts
+bun examples/test-imports.ts
+bun examples/with-errors.ts
