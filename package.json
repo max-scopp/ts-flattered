@@ -1,25 +1,12 @@
 {
   "name": "ts-flattered",
-  "module": "src/main.ts",
+  "module": "src/index.ts",
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
-    "@types/bun": "latest",
-    "@types/signale": "~1.4.7"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.2"
-  },
-  "optionalDependencies": {
-    "@angular/common": "^20.2.3",
-    "@angular/core": "^20.2.3",
-    "@angular/router": "^20.2.3",
-    "fs": "^0.0.1-security",
-    "lodash": "^4.17.21",
-    "rxjs": "^7.8.2"
+    "@types/bun": "latest"
   },
   "dependencies": {
-    "signale": "^1.4.0",
-    "ts-morph": "^26.0.0"
+    "typescript": "^5.9.2"
   }
 }

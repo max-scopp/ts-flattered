@@ -1,14 +1,131 @@
 # ts-flattered
 
-> A lightweight DSL for programmatically generating TypeScript code with automatic import resolution.
+A simple TypeScript code generation library that returns native TypeScript AST nodes, allowing seamless interoperability between DSL convenience functions and the native TypeScript Compiler API.
 
-## What it does
+## Key Features
 
-Generate TypeScript files programmatically using a simple, chainable API. Automatically resolves imports between generated files based on symbol usage.
+- **Native TypeScript AST**: All functions return actual `ts.MethodDeclaration`, `ts.ClassDeclaration`, etc.
+- **Interoperable**: Mix and match with `ts.factory` functions
+- **Simple API**: Clean, minimal interface
+- **No Wrapper Types**: Direct access to TypeScript AST nodes
 
-## Quick Example
+## Installation
 
-```ts
+```bash
+npm install ts-flattered typescript
+```
+
+## Usage
+
+### Basic Example
+
+```typescript
+import * as ts from "typescript";
+import { method, cls, addMethodToClass, SourceFile } from "ts-flattered";
+
+// Create a method using the DSL
+const greetMethod = method({
+  name: "greet",
+  parameters: [{ name: "name", type: "string" }],
+  returnType: "string",
+  body: "return `Hello, ${name}!`;"
+});
+
+// Create a class using native TypeScript
+const nativeClass = ts.factory.createClassDeclaration(
+  [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+  ts.factory.createIdentifier("Person"),
+  undefined,
+  undefined,
+  []
+);
+
+// Add the DSL method to the native class
+const classWithMethod = addMethodToClass(nativeClass, greetMethod);
+```
+
+### Source File Management
+
+```typescript
+import { SourceFile } from "ts-flattered";
+
+const sourceFile = new SourceFile();
+
+// Add imports
+sourceFile.addImport({
+  namedImports: ["Component"],
+  moduleSpecifier: "@angular/core"
+});
+
+// Add classes
+sourceFile.addClass({
+  name: "MyComponent",
+  isExported: true,
+  members: [
+    method({
+      name: "ngOnInit",
+      returnType: "void",
+      body: "console.log('Component initialized');"
+    })
+  ]
+});
+
+// Generate TypeScript code
+console.log(sourceFile.getFullText());
+```
+
+## API Reference
+
+### Functions
+
+#### `method(options: MethodOptions): ts.MethodDeclaration`
+Creates a TypeScript method declaration.
+
+#### `cls(options: ClassOptions): ts.ClassDeclaration`
+Creates a TypeScript class declaration.
+
+#### `imp(options: ImportOptions): ts.ImportDeclaration`
+Creates a TypeScript import declaration.
+
+#### `addMethodToClass(classDecl: ts.ClassDeclaration, method: ts.MethodDeclaration): ts.ClassDeclaration`
+Adds a method to an existing class declaration.
+
+### Classes
+
+#### `SourceFile`
+A wrapper for managing TypeScript statements and generating code.
+
+## Why ts-flattered?
+
+Unlike other code generation libraries that create their own AST or wrapper types, ts-flattered returns native TypeScript AST nodes. This means:
+
+1. **Full TypeScript API Access**: Use any `ts.factory` function alongside our DSL
+2. **No Learning Curve**: If you know the TypeScript Compiler API, you can use ts-flattered
+3. **Maximum Flexibility**: Not locked into our abstractions
+4. **Future Proof**: Compatible with TypeScript compiler updates
+
+## License
+
+MIT
+Adds a method to an existing class declaration.
+
+### Classes
+
+#### `SourceFile`
+A wrapper for managing TypeScript statements and generating code.
+
+## Why ts-flattered?
+
+Unlike other code generation libraries that create their own AST or wrapper types, ts-flattered returns native TypeScript AST nodes. This means:
+
+1. **Full TypeScript API Access**: Use any `ts.factory` function alongside our DSL
+2. **No Learning Curve**: If you know the TypeScript Compiler API, you can use ts-flattered
+3. **Maximum Flexibility**: Not locked into our abstractions
+4. **Future Proof**: Compatible with TypeScript compiler updates
+
+## License
+
+MITts
 import { cls, method, param, code, sourceFile, writeAll } from "ts-flattered";
 
 // Create files with classes
