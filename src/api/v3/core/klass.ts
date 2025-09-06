@@ -1,7 +1,6 @@
 import ts from "typescript";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $abstract, $export, $readonly } from "./modifier";
-import type { param } from "./params";
 
 export class KlassBuilder implements BuildableAST {
   #decl: ts.ClassDeclaration;

@@ -28,9 +28,9 @@ All builders **must return TS nodes fully compatible with `ts.factory`**.
 
 1. Create a `Builder` class implementing `BuildableAST`.
 2. Constructor should accept a **single options object** for essential properties (e.g., name, members, modifiers, type params, heritage).
-3. Maintain **internal state** for modifiers, children, type parameters, etc.
-4. Include **fluent modifier methods** (all prefixed with `$`) to mutate internal state.
-5. Include **dynamic methods** to add members or children (e.g., `addMember()`, `addTypeParam()`).
+3. Maintain **internal AST node** using `#decl` field that gets updated directly.
+4. Include **fluent modifier methods** (all prefixed with `$`) that update the AST node using `ts.factory.update*` methods.
+5. Include **dynamic methods** to add members or children that also update the AST node directly.
 
 **Builder skeleton:**
 
@@ -39,56 +39,86 @@ import ts from "typescript";
 import { BuildableAST } from "../utils/buildFluentApi";
 import { $export, $abstract, $readonly } from "./modifier";
 
-class ExampleBuilder<T extends ts.Node> implements BuildableAST {
-  #decl?: T;
-  #mods: ts.ModifierLike[];
-  #children: ts.Node[];
-  #name: string;
+class ExampleBuilder implements BuildableAST {
+  #decl: ts.ClassDeclaration; // Store the actual AST node
 
-  constructor({ name, children, mods }: { name: string; children?: ts.Node[]; mods?: ts.ModifierLike[] }) {
-    this.#name = name;
-    this.#children = children ?? [];
-    this.#mods = mods ?? [];
+  constructor({ name, children, mods }: { name: string; children?: ts.ClassElement[]; mods?: ts.ModifierLike[] }) {
+    // Create the initial AST node in constructor
+    this.#decl = ts.factory.createClassDeclaration(
+      mods,
+      ts.factory.createIdentifier(name),
+      undefined, // typeParameters
+      undefined, // heritageClauses
+      children ?? [],
+    );
   }
 
   // === Fluent modifier methods ===
   $export() {
-    this.#mods.push($export());
+    // Update the AST node directly using ts.factory.update* methods
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $export()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $abstract() {
-    this.#mods.push($abstract());
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $abstract()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $readonly() {
-    this.#mods.push($readonly());
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $readonly()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   // === Dynamic children/members methods ===
-  addChild(node: ts.Node) {
-    this.#children.push(node);
+  addMember(node: ts.ClassElement) {
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      [...this.#decl.members, node],
+    );
     return this;
   }
 
-  // === AST build/update methods ===
-  // build() → creates a new node using ts.factory
-  build(): T {
-    this.#decl = ts.factory.createNode(/* relevant factory call */);
+  // === AST access method ===
+  get(): ts.ClassDeclaration {
     return this.#decl;
-  }
-
-  // update() → updates an existing node using the **appropriate ts.factory update method**
-  update(): T {
-    if (!this.#decl) throw new Error("Node not built");
-    return ts.factory.updateNode(this.#decl, this.#mods, this.#children);
   }
 }
 ```
@@ -127,13 +157,14 @@ export const example = (name: string, children: ts.Node[] = [], mods?: ts.Modifi
 
 ## **5. Dynamic AST Building**
 
-* `build()` → always creates a **new AST node** using `ts.factory`.
-* `update()` → updates an **already-built node** using the **appropriate `ts.factory.update*` method**.
+* Constructor creates the **initial AST node** using `ts.factory.create*`.
+* Fluent methods **update the AST node directly** using the **appropriate `ts.factory.update*` method**.
+* `get()` method returns the **current AST node** (no building required).
 * Proxy ensures **all builder methods and AST properties** are accessible fluently.
 
 ```ts
-const myNode = example("MyClass").$export().addChild(propNode);
-const node: ts.ClassDeclaration = myNode.build();
+const myNode = example("MyClass").$export().addMember(propNode);
+const node: ts.ClassDeclaration = myNode.get(); // Returns updated AST node
 ```
 
 ---
@@ -154,11 +185,12 @@ const node: ts.ClassDeclaration = myNode.build();
 
 ## **7. Summary**
 
-* **Builder class** → internal state + fluent methods
-* **`build()`** → creates a new node via `ts.factory`
-* **`update()`** → modifies an existing node using the correct `ts.factory.update*` method
+* **Builder class** → maintains internal AST node (`#decl`) + fluent methods
+* **Constructor** → creates initial AST node via `ts.factory.create*`
+* **Fluent methods** → update AST node directly using `ts.factory.update*` methods
+* **`get()`** → returns the current AST node (no building step required)
 * **Public API** → `buildFluentApi` merges builder + AST proxy
 * **Modifiers** → always `$` prefixed (`$export`, `$abstract`, `$readonly`)
-* **Dynamic additions** → `addMember()`, `addChild()`, `addTypeParam()`
+* **Dynamic additions** → `addMember()`, `addChild()`, `addTypeParam()` update AST directly
 
 > Following this ensures all new APIs are **consistent, fluent, and fully compatible** with TypeScript AST and your DSL.

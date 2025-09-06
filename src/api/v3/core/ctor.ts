@@ -4,10 +4,7 @@ import { $private, $protected, $public } from "./modifier";
 import { param } from "./params";
 
 class CtorBuilder implements BuildableAST {
-  #decl: ts.ConstructorDeclaration | null = null;
-  #mods: ts.ModifierLike[];
-  #parameters: ts.ParameterDeclaration[];
-  #body: ts.Block;
+  #decl: ts.ConstructorDeclaration;
 
   constructor({
     args,
@@ -16,29 +13,51 @@ class CtorBuilder implements BuildableAST {
     args: ts.ParameterDeclaration[];
     body: ts.Block;
   }) {
-    this.#parameters = args;
-    this.#body = body;
-    this.#mods = [];
+    this.#decl = ts.factory.createConstructorDeclaration(
+      undefined, // modifiers
+      args,
+      body,
+    );
   }
 
   // Fluent modifier methods
   $private() {
-    this.#mods.push($private());
+    this.#decl = ts.factory.updateConstructorDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $private()],
+      this.#decl.parameters,
+      this.#decl.body,
+    );
     return this;
   }
 
   $protected() {
-    this.#mods.push($protected());
+    this.#decl = ts.factory.updateConstructorDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $protected()],
+      this.#decl.parameters,
+      this.#decl.body,
+    );
     return this;
   }
 
   $public() {
-    this.#mods.push($public());
+    this.#decl = ts.factory.updateConstructorDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $public()],
+      this.#decl.parameters,
+      this.#decl.body,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updateConstructorDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.parameters,
+      this.#decl.body,
+    );
     return this;
   }
 
@@ -77,28 +96,17 @@ class CtorBuilder implements BuildableAST {
       );
     }
 
-    this.#parameters.push(paramDecl);
+    this.#decl = ts.factory.updateConstructorDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      [...this.#decl.parameters, paramDecl],
+      this.#decl.body,
+    );
     return this;
   }
 
   get(): ts.ConstructorDeclaration {
-    this.#decl = ts.factory.createConstructorDeclaration(
-      this.#mods,
-      this.#parameters,
-      this.#body,
-    );
     return this.#decl;
-  }
-
-  update(): ts.ConstructorDeclaration {
-    if (!this.#decl) throw new Error("Constructor declaration not built");
-
-    return ts.factory.updateConstructorDeclaration(
-      this.#decl,
-      this.#mods,
-      this.#parameters,
-      this.#body,
-    );
   }
 }
 

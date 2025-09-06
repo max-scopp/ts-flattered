@@ -10,12 +10,7 @@ import {
 } from "./modifier";
 
 class PropBuilder implements BuildableAST {
-  #decl: ts.PropertyDeclaration | null = null;
-  #mods: ts.ModifierLike[];
-  #name: string;
-  #type?: ts.TypeNode;
-  #optional: boolean;
-  #initializer?: ts.Expression;
+  #decl: ts.PropertyDeclaration;
 
   constructor({
     name,
@@ -26,86 +21,130 @@ class PropBuilder implements BuildableAST {
     type?: ts.TypeNode;
     optional?: boolean;
   }) {
-    this.#name = name;
-    this.#type = type;
-    this.#optional = optional ?? false;
-    this.#mods = [];
+    this.#decl = ts.factory.createPropertyDeclaration(
+      undefined, // modifiers
+      name,
+      optional
+        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+        : undefined,
+      type,
+      undefined, // initializer
+    );
   }
 
   // Fluent modifier methods
   $export() {
-    this.#mods.push($export());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $export()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $readonly() {
-    this.#mods.push($readonly());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $readonly()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $static() {
-    this.#mods.push($static());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $static()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $private() {
-    this.#mods.push($private());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $private()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $protected() {
-    this.#mods.push($protected());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $protected()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $public() {
-    this.#mods.push($public());
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $public()],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   // Set optional
   $optional() {
-    this.#optional = true;
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   // Set initializer
   $init(initializer: ts.Expression) {
-    this.#initializer = initializer;
+    this.#decl = ts.factory.updatePropertyDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      initializer,
+    );
     return this;
   }
 
   get(): ts.PropertyDeclaration {
-    this.#decl = ts.factory.createPropertyDeclaration(
-      this.#mods,
-      this.#name,
-      this.#optional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      this.#type,
-      this.#initializer,
-    );
     return this.#decl;
-  }
-
-  update(): ts.PropertyDeclaration {
-    if (!this.#decl) throw new Error("Property declaration not built");
-
-    return ts.factory.updatePropertyDeclaration(
-      this.#decl,
-      this.#mods,
-      this.#decl.name,
-      this.#optional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      this.#type,
-      this.#initializer,
-    );
   }
 }
 

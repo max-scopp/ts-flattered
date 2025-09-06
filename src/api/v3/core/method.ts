@@ -4,13 +4,7 @@ import { $async, $private, $protected, $public, $static } from "./modifier";
 import { param } from "./params";
 
 class MethodBuilder implements BuildableAST {
-  #decl: ts.MethodDeclaration | null = null;
-  #mods: ts.ModifierLike[];
-  #parameters: ts.ParameterDeclaration[];
-  #body: ts.Block;
-  #name: string;
-  #typeParams: ts.TypeParameterDeclaration[];
-  #returnType?: ts.TypeNode;
+  #decl: ts.MethodDeclaration;
 
   constructor({
     name,
@@ -27,85 +21,144 @@ class MethodBuilder implements BuildableAST {
     typeParams?: ts.TypeParameterDeclaration[];
     returnType?: ts.TypeNode;
   }) {
-    this.#name = name;
-    this.#parameters = args;
-    this.#body = body;
-    this.#mods = mods ?? [];
-    this.#typeParams = typeParams ?? [];
-    this.#returnType = returnType;
+    this.#decl = ts.factory.createMethodDeclaration(
+      mods,
+      undefined, // asterisk token
+      name,
+      undefined, // question token
+      typeParams,
+      args,
+      returnType,
+      body,
+    );
   }
 
   // Fluent modifier methods
   $private() {
-    this.#mods.push($private());
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $private()],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   $protected() {
-    this.#mods.push($protected());
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $protected()],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   $public() {
-    this.#mods.push($public());
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $public()],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   $static() {
-    this.#mods.push($static());
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $static()],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   $async() {
-    this.#mods.push($async());
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $async()],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   // Add parameter
   addParam(name: string, type?: ts.TypeNode) {
-    this.#parameters.push(param(name, type).get());
+    const newParam = param(name, type).get();
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      [...this.#decl.parameters, newParam],
+      this.#decl.type,
+      this.#decl.body,
+    );
     return this;
   }
 
   // Set return type
   $returnType(type: ts.TypeNode) {
-    this.#returnType = type;
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      type,
+      this.#decl.body,
+    );
     return this;
   }
 
   get(): ts.MethodDeclaration {
-    this.#decl = ts.factory.createMethodDeclaration(
-      this.#mods,
-      undefined, // asterisk token
-      this.#name,
-      undefined, // question token
-      this.#typeParams,
-      this.#parameters,
-      this.#returnType,
-      this.#body,
-    );
     return this.#decl;
-  }
-
-  update(): ts.MethodDeclaration {
-    if (!this.#decl) throw new Error("Method declaration not built");
-
-    return ts.factory.updateMethodDeclaration(
-      this.#decl,
-      this.#mods,
-      this.#decl.asteriskToken,
-      this.#decl.name,
-      this.#decl.questionToken,
-      this.#typeParams,
-      this.#parameters,
-      this.#returnType,
-      this.#body,
-    );
   }
 }
 

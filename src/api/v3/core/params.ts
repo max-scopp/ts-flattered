@@ -3,12 +3,7 @@ import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $private, $protected, $public, $readonly } from "./modifier";
 
 class ParamsBuilder implements BuildableAST {
-  #decl: ts.ParameterDeclaration | null = null;
-  #mods: ts.ModifierLike[];
-  #name: string;
-  #type?: ts.TypeNode;
-  #optional: boolean;
-  #initializer?: ts.Expression;
+  #decl: ts.ParameterDeclaration;
 
   constructor({
     name,
@@ -21,79 +16,114 @@ class ParamsBuilder implements BuildableAST {
     optional?: boolean;
     initializer?: ts.Expression;
   }) {
-    this.#name = name;
-    this.#type = type;
-    this.#optional = optional ?? false;
-    this.#initializer = initializer;
-    this.#mods = [];
+    this.#decl = ts.factory.createParameterDeclaration(
+      undefined, // modifiers
+      undefined, // no dotDotDotToken for now
+      name,
+      optional
+        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+        : undefined,
+      type,
+      initializer,
+    );
   }
 
   // Fluent modifier methods
   $readonly() {
-    this.#mods.push($readonly());
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $readonly()],
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $private() {
-    this.#mods.push($private());
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $private()],
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $protected() {
-    this.#mods.push($protected());
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $protected()],
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $public() {
-    this.#mods.push($public());
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $public()],
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   // Set optional
   $optional() {
-    this.#optional = true;
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+      this.#decl.type,
+      this.#decl.initializer,
+    );
     return this;
   }
 
   // Set initializer
   $init(initializer: ts.Expression) {
-    this.#initializer = initializer;
+    this.#decl = ts.factory.updateParameterDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.dotDotDotToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.type,
+      initializer,
+    );
     return this;
   }
 
   get(): ts.ParameterDeclaration {
-    this.#decl = ts.factory.createParameterDeclaration(
-      this.#mods,
-      undefined, // no dotDotDotToken for now
-      this.#name,
-      this.#optional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      this.#type,
-      this.#initializer,
-    );
     return this.#decl;
-  }
-
-  update(): ts.ParameterDeclaration {
-    if (!this.#decl) throw new Error("Parameter declaration not built");
-
-    return ts.factory.updateParameterDeclaration(
-      this.#decl,
-      this.#mods,
-      this.#decl.dotDotDotToken,
-      this.#decl.name,
-      this.#optional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      this.#type,
-      this.#initializer,
-    );
   }
 }
 
