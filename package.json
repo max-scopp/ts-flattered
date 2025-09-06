@@ -4,7 +4,8 @@
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "ts-morph": "^26.0.0"
   },
   "dependencies": {
     "typescript": "^5.9.2"

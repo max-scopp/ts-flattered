@@ -4,15 +4,16 @@ This folder contains performance tests and reports for the `ts-flattered` librar
 
 ## Test Overview
 
-The test compares three approaches for building TypeScript AST nodes:
+The test compares four approaches for building TypeScript AST nodes:
 
 1. **Initial Declaration Style**: Pass all parameters upfront (highest abstraction)
 2. **Chainable Style**: Use fluent method chaining (balanced approach)
 3. **Raw ts.factory API**: Direct use of TypeScript's native factory methods (fastest)
+4. **ts-morph API**: Object-oriented AST manipulation library
 
 ## Example Code Variants
 
-Here are the three code variants used in the performance test:
+Here are the four code variants used in the performance test:
 
 ### 1. Initial Declaration Style
 
@@ -119,6 +120,35 @@ const greeter = ts.factory.createClassDeclaration(
     ),
   ],
 );
+```
+
+### 4. ts-morph API
+
+```typescript
+const project = new Project();
+const sourceFile = project.createSourceFile("temp.ts");
+
+const greeterClass = sourceFile.addClass({
+  name: "Greeter",
+  isExported: true,
+});
+
+greeterClass.addProperty({
+  name: "message",
+  type: "string",
+  isReadonly: true,
+});
+
+greeterClass.addConstructor({
+  parameters: [{ name: "message", type: "string", isReadonly: true }],
+  statements: ["this.message = message;"],
+});
+
+greeterClass.addMethod({
+  name: "greet",
+  statements: ['console.log("Hello, world!");', 'return "done";'],
+  isAsync: true,
+});
 ```
 
 ## Running Tests

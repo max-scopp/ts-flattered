@@ -1,4 +1,5 @@
 import { performance } from "perf_hooks";
+import { Project } from "ts-morph";
 import ts from "typescript";
 import {
   $,
@@ -152,8 +153,46 @@ function example3() {
 
   return greeter;
 }
+
+// Example 4: ts-morph API
+function example4() {
+  const project = new Project();
+  const sourceFile = project.createSourceFile("temp.ts");
+
+  const greeterClass = sourceFile.addClass({
+    name: "Greeter",
+    isExported: true,
+  });
+
+  greeterClass.addProperty({
+    name: "message",
+    type: "string",
+    isReadonly: true,
+  });
+
+  greeterClass.addConstructor({
+    parameters: [{ name: "message", type: "string", isReadonly: true }],
+    statements: ["this.message = message;"],
+  });
+
+  greeterClass.addMethod({
+    name: "greet",
+    statements: ['console.log("Hello, world!");', 'return "done";'],
+    isAsync: true,
+  });
+
+  // Get the TypeScript compiler AST
+  const tsSourceFile = project.getSourceFile("temp.ts");
+  if (!tsSourceFile) throw new Error("Source file not found");
+
+  const classDecl = tsSourceFile.getClass("Greeter");
+  if (!classDecl) throw new Error("Class not found");
+
+  return classDecl.compilerNode;
+}
+
 console.log(
-  "Performance Report: Declaration vs Chainable vs Raw ts.factory (100k iterations)",
+  "Performance Report: Declaration vs Chainable vs ts-morph vs Raw ts.factory (100k iterations)",
 );
 console.log(
   "=================================================================================",
@@ -166,6 +205,7 @@ const result1 = runPerformanceTest(
 );
 const result2 = runPerformanceTest("Chainable Style", example2, 100000);
 const result3 = runPerformanceTest("Raw ts.factory API", example3, 100000);
+const result4 = runPerformanceTest("ts-morph API", example4, 100000);
 
 // Key Finding
 console.log("\n=== KEY FINDING ===");
@@ -173,8 +213,11 @@ const factoryVsDeclaration =
   ((result1.avgTime - result3.avgTime) / result3.avgTime) * 100;
 const factoryVsChainable =
   ((result2.avgTime - result3.avgTime) / result3.avgTime) * 100;
+const factoryVsTsmorph =
+  ((result4.avgTime - result3.avgTime) / result3.avgTime) * 100;
 const timeDiffDeclaration = result1.avgTime - result3.avgTime;
 const timeDiffChainable = result2.avgTime - result3.avgTime;
+const timeDiffTsmorph = result4.avgTime - result3.avgTime;
 
 console.log(
   `Raw ts.factory is ${factoryVsDeclaration.toFixed(1)}% FASTER than Initial Declaration style`,
@@ -189,10 +232,16 @@ console.log(
   `  → Time difference: ${(timeDiffChainable * 1000).toFixed(1)} microseconds per operation`,
 );
 console.log(
+  `Raw ts.factory is ${factoryVsTsmorph.toFixed(1)}% FASTER than ts-morph`,
+);
+console.log(
+  `  → Time difference: ${(timeDiffTsmorph * 1000).toFixed(1)} microseconds per operation`,
+);
+console.log(
   `\n📊 Context: While percentages seem dramatic, we're talking about MICROSECONDS per AST node creation.`,
 );
 console.log(
-  `   For 100k operations: Declaration takes ${(timeDiffDeclaration * 100000).toFixed(0)}ms extra, Chainable takes ${(timeDiffChainable * 100000).toFixed(0)}ms extra.`,
+  `   For 100k operations: Declaration takes ${(timeDiffDeclaration * 100000).toFixed(0)}ms extra, Chainable takes ${(timeDiffChainable * 100000).toFixed(0)}ms extra, ts-morph takes ${(timeDiffTsmorph * 100000).toFixed(0)}ms extra.`,
 );
 
 // Simple comparison
@@ -203,6 +252,9 @@ console.log(
 );
 console.log(
   `Declaration:    ${result1.avgTime.toFixed(4)} ms (${(((result1.avgTime - result3.avgTime) / result3.avgTime) * 100).toFixed(1)}% slower, ${(timeDiffDeclaration * 1000).toFixed(1)}μs extra)`,
+);
+console.log(
+  `ts-morph:       ${result4.avgTime.toFixed(4)} ms (${(((result4.avgTime - result3.avgTime) / result3.avgTime) * 100).toFixed(1)}% slower, ${(timeDiffTsmorph * 1000).toFixed(1)}μs extra)`,
 );
 console.log(
   `\n💡 Note: These are MICROSECOND differences per AST node. Choose based on developer experience, not raw performance.`,
@@ -225,9 +277,14 @@ const code3 = printer.printNode(
   example3(),
   ts.createSourceFile("", "", ts.ScriptTarget.Latest),
 );
+const code4 = printer.printNode(
+  ts.EmitHint.Unspecified,
+  example4() as unknown as ts.Node,
+  ts.createSourceFile("", "", ts.ScriptTarget.Latest),
+);
 
 console.log("\n=== Code Verification ===");
 console.log(`Declaration & Chainable identical: ${code1 === code2}`);
 console.log(
-  `All approaches semantically equivalent: ${code1.replace(/\s+/g, "") === code2.replace(/\s+/g, "") && code1.replace(/\s+/g, "") === code3.replace(/\s+/g, "")}`,
+  `All approaches semantically equivalent: ${code1.replace(/\s+/g, "") === code2.replace(/\s+/g, "") && code1.replace(/\s+/g, "") === code3.replace(/\s+/g, "") && code1.replace(/\s+/g, "") === code4.replace(/\s+/g, "")}`,
 );
