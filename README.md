@@ -37,11 +37,11 @@ await writeAll({ outputDir: "./generated" });
 | Aspect | ts-flattered Declarative | ts-flattered Chainable | ts-morph | ts.factory |
 |--------|------------------------|-----------------------|----------|------------|
 | **API Style** | Declarative, functional | Fluent chaining | Object-oriented | Imperative factory |
-| **Readability** | ⭐⭐⭐ (Excellent) | ⭐⭐⭐ (Excellent) | ⭐⭐ (Good) | ⭐ (Poor) |
-| **Performance** | ⭐⭐ (Good) | ⭐⭐ (Good) | ⭐ (Poor) | ⭐⭐⭐ (Excellent) |
-| **Type Safety** | ⭐⭐⭐ (Excellent) | ⭐⭐⭐ (Excellent) | ⭐⭐ (Good) | ⭐⭐⭐ (Excellent) |
-| **Learning Curve** | ⭐⭐ (Good) | ⭐⭐⭐ (Excellent) | ⭐ (Poor) | ⭐ (Poor) |
-| **Bundle Size** | ⭐⭐⭐ (Excellent) | ⭐⭐⭐ (Excellent) | ⭐⭐ (Good) | ⭐⭐⭐ (Excellent) |
+| **Readability** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🔴 Poor |
+| **Performance** | 🟡 Good | 🟡 Good | 🔴 Poor | 🟢 Excellent |
+| **Type Safety** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
+| **Learning Curve** | 🟡 Good | 🟢 Excellent | 🔴 Poor | 🔴 Poor |
+| **Bundle Size** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
 | **Use Case** | Code generation, DSLs | Interactive building | Source analysis/modification | Low-level AST work |
 
 ### Key Insights
