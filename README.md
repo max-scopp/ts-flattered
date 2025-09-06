@@ -18,11 +18,14 @@ npm install ts-flattered typescript
 ## Quick Start
 
 ```typescript
-import { cls, method, param, code, sourceFile, writeAll } from "ts-flattered";
+import { cls, method, param, block, call, $, sourceFile, writeAll } from "ts-flattered";
 
 sourceFile("Dog.ts", [
   cls("Dog", [
-    method({ name: "bark", body: code`console.log("Woof!")` })
+    method({ 
+      name: "bark", 
+      body: block([call("console.log", [$("Woof!")])])
+    })
   ])
 ]);
 
@@ -46,15 +49,32 @@ await writeAll({ outputDir: "./generated" });
 - **ts-flattered Declarative**: Best for readability and maintainability when you know the structure upfront. Ideal for code generation and DSL creation.
 - **ts-flattered Chainable**: Sweet spot for interactive AST building with excellent developer experience and reasonable performance.
 
+## Performance Overview
+
+ts-flattered offers excellent performance with minimal overhead compared to raw `ts.factory`:
+
+- **ts-flattered Declarative**: 0.0169 ms per operation (165% slower than raw ts.factory)
+- **ts-flattered Chainable**: 0.0097 ms per operation (52% slower than raw ts.factory)
+- **Raw ts.factory**: 0.0064 ms per operation (fastest)
+- **ts-morph**: 0.6235 ms per operation (**9,671% slower** than raw ts.factory)
+
+### Key Finding
+**ts-morph is 97x slower than ts-flattered** - While these are microsecond differences per operation, ts-morph's overhead becomes significant at scale (61.7ms extra per 100k operations vs ts-flattered's 1.7ms).
+
+**Choose based on developer experience**: ts-flattered's readability benefits outweigh the tiny performance cost for most applications.
+
 ## Examples
 
 ### Declarative Approach
 ```typescript
-import { cls, method, param, code, sourceFile, writeAll } from "ts-flattered";
+import { cls, method, param, block, call, $, id, arrow, sourceFile, writeAll } from "ts-flattered";
 
 sourceFile("Dog.ts", [
   cls("Dog", [
-    method({ name: "bark", body: code`console.log("Woof!")` })
+    method({ 
+      name: "bark", 
+      body: block([call("console.log", [$("Woof!")])])
+    })
   ])
 ]);
 
@@ -63,7 +83,9 @@ sourceFile("PetStore.ts", [
     method({
       name: "getDogs",
       params: [param("dogs", "Dog[]")],
-      body: code`dogs.forEach(dog => dog.bark())`
+      body: block([
+        call("forEach", [id("dogs"), arrow([param("dog")], call("bark", [id("dog")]))])
+      ])
     })
   ])
 ]);
@@ -73,21 +95,23 @@ await writeAll({ outputDir: "./generated" });
 
 ### Chainable Approach
 ```typescript
-const greeter = tsf.klass("Greeter")
+import { klass, prop, ctor, method, param, block, call, $, assign, ret, this_, $string } from "ts-flattered";
+
+const greeter = klass("Greeter")
   .$export()
   .addMember(
-    tsf.prop("message", tsf.$string()).$readonly()
+    prop("message", $string()).$readonly()
   )
   .addMember(
-    tsf.ctor([{ name: "message", type: tsf.$string() }], 
-      tsf.block([tsf.assign("this.message", tsf.this_())])
+    ctor([param("message", $string())], 
+      block([assign("this.message", this_())])
     )
   )
   .addMember(
-    tsf.method("greet", [], 
-      tsf.block([
-        tsf.call("console.log", [tsf.lit("Hello, world!")]),
-        tsf.ret(tsf.lit("done"))
+    method("greet", [], 
+      block([
+        call("console.log", [$("Hello, world!")]),
+        ret($("done"))
       ])
     ).$async()
   );
@@ -132,10 +156,14 @@ const klassNode = ts.factory.createClassDeclaration(
 ## Core API
 
 - **`sourceFile(name, statements)`** - Create a TypeScript file
-- **`cls(name, members)`** - Create a class with methods
-- **`method(opts)`** - Create a method with params, return type, body
-- **`param(name, type)`** - Method parameter
-- **`code`literals`** - Template literal for arbitrary TypeScript code
+- **`klass(name, members?)`** - Create a class with optional members
+- **`method(name, params?, body?)`** - Create a method with optional params and body
+- **`prop(name, type?)`** - Create a property with optional type
+- **`param(name, type?)`** - Create a method parameter
+- **`block(statements)`** - Create a code block
+- **`call(functionName, args?)`** - Create a function call
+- **`$(value)`** - Create a string/identifier literal
+- **`assign(target, value)`** - Create an assignment expression
 - **`writeAll(opts)`** - Generate all files to disk
 
 ## Why ts-flattered?

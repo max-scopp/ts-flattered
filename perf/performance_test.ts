@@ -192,20 +192,16 @@ function example4() {
 }
 
 console.log(
-  "Performance Report: Declaration vs Chainable vs ts-morph vs Raw ts.factory (100k iterations)",
+  "Performance Report: Declaration vs Chainable vs ts-morph vs Raw ts.factory",
 );
 console.log(
   "=================================================================================",
 );
 
-const result1 = runPerformanceTest(
-  "Initial Declaration Style",
-  example1,
-  100000,
-);
-const result2 = runPerformanceTest("Chainable Style", example2, 100000);
-const result3 = runPerformanceTest("Raw ts.factory API", example3, 100000);
-const result4 = runPerformanceTest("ts-morph API", example4, 100000);
+const result1 = runPerformanceTest("Initial Declaration Style", example1);
+const result2 = runPerformanceTest("Chainable Style", example2);
+const result3 = runPerformanceTest("Raw ts.factory API", example3);
+const result4 = runPerformanceTest("ts-morph API", example4);
 
 // Key Finding
 console.log("\n=== KEY FINDING ===");
