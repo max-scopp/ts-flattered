@@ -67,7 +67,7 @@ ts-flattered offers excellent performance with minimal overhead compared to raw 
 
 ### Declarative Approach
 ```typescript
-import { cls, method, param, block, call, $, id, arrow, sourceFile, writeAll } from "ts-flattered";
+import { cls, method, block, call, $, sourceFile, writeAll } from "ts-flattered";
 
 sourceFile("Dog.ts", [
   cls("Dog", [
@@ -78,75 +78,71 @@ sourceFile("Dog.ts", [
   ])
 ]);
 
-sourceFile("PetStore.ts", [
-  cls("PetStore", [
-    method({
-      name: "getDogs",
-      params: [param("dogs", "Dog[]")],
-      body: block([
-        call("forEach", [id("dogs"), arrow([param("dog")], call("bark", [id("dog")]))])
-      ])
-    })
-  ])
-]);
-
 await writeAll({ outputDir: "./generated" });
 ```
 
 ### Chainable Approach
 ```typescript
-import { klass, prop, ctor, method, param, block, call, $, assign, ret, this_, $string } from "ts-flattered";
+import { klass, method, block, call, $, sourceFile, writeAll } from "ts-flattered";
 
-const greeter = klass("Greeter")
+const dog = klass("Dog")
   .$export()
   .addMember(
-    prop("message", $string()).$readonly()
-  )
-  .addMember(
-    ctor([param("message", $string())], 
-      block([assign("this.message", this_())])
+    method("bark", [], 
+      block([call("console.log", [$("Woof!")])])
     )
-  )
-  .addMember(
-    method("greet", [], 
-      block([
-        call("console.log", [$("Hello, world!")]),
-        ret($("done"))
-      ])
-    ).$async()
   );
+
+sourceFile("Dog.ts", [dog.get()]);
+await writeAll({ outputDir: "./generated" });
 ```
 
 ### Comparison with Alternatives
 
 #### Using ts-morph
 ```ts
-const file = project.createSourceFile("Greeter.ts");
-const klass = file.addClass({ name: "Greeter", isExported: true });
-klass.addProperty({ name: "message", type: "string", isReadonly: true });
-klass.addConstructor({
-  parameters: [{ name: "message", type: "string" }],
-  statements: ["this.message = message;"]
+const file = project.createSourceFile("Dog.ts");
+
+const klass = file.addClass({
+  name: "Dog",
+  isExported: true
 });
-klass.addMethod({ name: "greet", isAsync: true, statements: ["console.log('Hello, world!');", "return 'done';"] });
+
+klass.addMethod({
+  name: "bark",
+  statements: ['console.log("Woof!")']
+});
 ```
 
 #### Using raw ts.factory
 ```ts
-const klassNode = ts.factory.createClassDeclaration(
+const dogClass = ts.factory.createClassDeclaration(
   [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-  "Greeter",
-  [],
+  "Dog",
+  undefined,
   undefined,
   [
-    ts.factory.createPropertyDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword)],
-      "message",
+    ts.factory.createMethodDeclaration(
       undefined,
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
-      undefined
-    ),
-    // ... 30+ more lines of verbose AST construction
+      undefined,
+      "bark",
+      undefined,
+      undefined,
+      [],
+      ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+      ts.factory.createBlock([
+        ts.factory.createExpressionStatement(
+          ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+              ts.factory.createIdentifier("console"),
+              "log"
+            ),
+            undefined,
+            [ts.factory.createStringLiteral("Woof!")]
+          )
+        )
+      ])
+    )
   ]
 );
 ```
