@@ -29,22 +29,13 @@ export function buildFluentApi<
   // Proxy that gets the current AST node on each access
   const proxy = new Proxy(builder, {
     get(target, prop, receiver) {
-      // Get the current node from the builder
-      const currentNode = target.get();
+      // First check if it's a builder method/property
+      const builderValue = Reflect.get(target, prop, receiver);
 
-      // Prioritize AST node properties, fallback to builder methods
-      if (prop in currentNode) {
-        return (currentNode as unknown as Record<string | symbol, unknown>)[
-          prop
-        ];
-      }
-
-      const value = Reflect.get(target, prop, receiver);
-
-      // If it's a method, wrap it to ensure fluent chaining returns the proxy
-      if (typeof value === "function") {
+      // If it's a method on the builder, wrap it to ensure fluent chaining returns the proxy
+      if (typeof builderValue === "function") {
         return (...args: unknown[]) => {
-          const result = value.apply(target, args);
+          const result = builderValue.apply(target, args);
           // If the method returns the builder (for fluent chaining), return the proxy instead
           if (result === target) {
             return receiver;
@@ -53,7 +44,20 @@ export function buildFluentApi<
         };
       }
 
-      return value;
+      // If it's a builder property, return it
+      if (builderValue !== undefined) {
+        return builderValue;
+      }
+
+      // Fallback to AST node properties only if not found on builder
+      const currentNode = target.get();
+      if (prop in currentNode) {
+        return (currentNode as unknown as Record<string | symbol, unknown>)[
+          prop
+        ];
+      }
+
+      return builderValue;
     },
   });
 

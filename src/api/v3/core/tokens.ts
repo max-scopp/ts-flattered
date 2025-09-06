@@ -5,19 +5,6 @@ export const this_ = (): ts.ThisExpression => ts.factory.createThis();
 
 export const super_ = (): ts.SuperExpression => ts.factory.createSuper();
 
-// Assignment expression
-export const assign = (
-  lhs: string | ts.Expression,
-  rhs: ts.Expression,
-): ts.BinaryExpression => {
-  const left = typeof lhs === "string" ? ts.factory.createIdentifier(lhs) : lhs;
-  return ts.factory.createBinaryExpression(
-    left,
-    ts.factory.createToken(ts.SyntaxKind.EqualsToken),
-    rhs,
-  );
-};
-
 // Literals
 export const $ = (value: string | number | boolean): ts.Expression => {
   if (typeof value === "string") {
