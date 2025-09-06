@@ -68,7 +68,7 @@ class MethodBuilder implements BuildableAST {
 
   // Add parameter
   addParam(name: string, type?: ts.TypeNode) {
-    this.#parameters.push(param(name, type).build());
+    this.#parameters.push(param(name, type).get());
     return this;
   }
 
@@ -78,7 +78,7 @@ class MethodBuilder implements BuildableAST {
     return this;
   }
 
-  build(): ts.MethodDeclaration {
+  get(): ts.MethodDeclaration {
     this.#decl = ts.factory.createMethodDeclaration(
       this.#mods,
       undefined, // asterisk token

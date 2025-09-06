@@ -19,7 +19,7 @@ export const assign = (
 };
 
 // Literals
-export const lit = (value: string | number | boolean): ts.Expression => {
+export const $ = (value: string | number | boolean): ts.Expression => {
   if (typeof value === "string") {
     return ts.factory.createStringLiteral(value);
   } else if (typeof value === "number") {

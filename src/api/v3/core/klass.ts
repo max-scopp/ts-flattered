@@ -1,14 +1,10 @@
 import ts from "typescript";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $abstract, $export, $readonly } from "./modifier";
+import type { param } from "./params";
 
-class KlassBuilder implements BuildableAST {
-  #decl: ts.ClassDeclaration | null = null;
-  #mods: ts.ModifierLike[];
-  #members: ts.ClassElement[];
-  #name: string;
-  #typeParams: ts.TypeParameterDeclaration[];
-  #heritageClauses: ts.HeritageClause[];
+export class KlassBuilder implements BuildableAST {
+  #decl: ts.ClassDeclaration;
 
   constructor({
     name,
@@ -23,66 +19,90 @@ class KlassBuilder implements BuildableAST {
     typeParams?: ts.TypeParameterDeclaration[];
     heritage?: ts.HeritageClause[];
   }) {
-    this.#name = name;
-    this.#members = members ?? [];
-    this.#mods = mods ?? [];
-    this.#typeParams = typeParams ?? [];
-    this.#heritageClauses = heritage ?? [];
+    this.#decl = ts.factory.createClassDeclaration(
+      mods,
+      ts.factory.createIdentifier(name),
+      typeParams,
+      heritage,
+      members ?? [],
+    );
   }
 
   // Fluent modifier methods
   $export() {
-    this.#mods.push($export());
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $export()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $abstract() {
-    this.#mods.push($abstract());
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $abstract()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $readonly() {
-    this.#mods.push($readonly());
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), $readonly()],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   $mod(mod: ts.Modifier) {
-    this.#mods.push(mod);
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      [...(this.#decl.modifiers || []), mod],
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
   addMember(member: ts.ClassElement) {
-    this.#members.push(member);
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      [...this.#decl.members, member],
+    );
     return this;
   }
 
   addTypeParam(param: ts.TypeParameterDeclaration) {
-    this.#typeParams.push(param);
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      [...(this.#decl.typeParameters || []), param],
+      this.#decl.heritageClauses,
+      this.#decl.members,
+    );
     return this;
   }
 
-  build(): ts.ClassDeclaration {
-    this.#decl = ts.factory.createClassDeclaration(
-      this.#mods,
-      this.#name,
-      this.#typeParams,
-      this.#heritageClauses,
-      this.#members,
-    );
+  get(): ts.ClassDeclaration {
     return this.#decl;
-  }
-
-  update(): ts.ClassDeclaration {
-    if (!this.#decl) throw new Error("Class declaration not built");
-
-    return ts.factory.updateClassDeclaration(
-      this.#decl,
-      this.#mods,
-      this.#decl.name,
-      this.#typeParams,
-      this.#heritageClauses,
-      this.#members,
-    );
   }
 }
 

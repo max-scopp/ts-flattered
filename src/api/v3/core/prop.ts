@@ -80,7 +80,7 @@ class PropBuilder implements BuildableAST {
     return this;
   }
 
-  build(): ts.PropertyDeclaration {
+  get(): ts.PropertyDeclaration {
     this.#decl = ts.factory.createPropertyDeclaration(
       this.#mods,
       this.#name,

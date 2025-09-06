@@ -1,25 +1,31 @@
 import ts from "typescript";
-import * as tsf from "./public_api";
+import {
+  $,
+  assign,
+  block,
+  call,
+  ctor,
+  klass,
+  method,
+  param,
+  prop,
+  ret,
+  this_,
+} from "./public_api";
+import { $string } from "./types";
 
-const greeter = tsf
-  .klass("Greeter", [
-    tsf.prop("message", tsf.$string()).$readonly(),
-    tsf.ctor(
-      [tsf.param("message", tsf.$string()).$readonly()],
-      tsf.block([tsf.assign("this.message", tsf.this_())]),
-    ),
-    tsf
-      .method(
-        "greet",
-        [],
-        tsf.block([
-          tsf.call("console.log", [tsf.lit("Hello, world!")]),
-          tsf.ret(tsf.lit("done")),
-        ]),
-      )
-      .$async(),
-  ])
-  .$export();
+const greeter = klass("Greeter", [
+  prop("message", $string()).$readonly(),
+  ctor(
+    [param("message", $string()).$readonly()],
+    block([assign("this.message", this_())]),
+  ),
+  method(
+    "greet",
+    [],
+    block([call("console.log", [$("Hello, world!")]), ret($("done"))]),
+  ).$async(),
+]).$export();
 
 // Print result
 const sf = ts.factory.createSourceFile(

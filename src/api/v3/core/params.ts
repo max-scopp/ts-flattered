@@ -66,7 +66,7 @@ class ParamsBuilder implements BuildableAST {
     return this;
   }
 
-  build(): ts.ParameterDeclaration {
+  get(): ts.ParameterDeclaration {
     this.#decl = ts.factory.createParameterDeclaration(
       this.#mods,
       undefined, // no dotDotDotToken for now

@@ -62,7 +62,7 @@ class CtorBuilder implements BuildableAST {
       });
     }
 
-    let paramDecl = p.build();
+    let paramDecl = p.get();
 
     // Handle dotDotDot (rest parameters)
     if (arg.dotDotDot) {
@@ -81,7 +81,7 @@ class CtorBuilder implements BuildableAST {
     return this;
   }
 
-  build(): ts.ConstructorDeclaration {
+  get(): ts.ConstructorDeclaration {
     this.#decl = ts.factory.createConstructorDeclaration(
       this.#mods,
       this.#parameters,
