@@ -5,18 +5,19 @@ const greeter = tsf
   .klass("Greeter", [
     tsf.prop("message", tsf.$string()).$readonly(),
     tsf.ctor(
-      [{ name: "message", type: tsf.$string() }],
+      [tsf.param("message", tsf.$string()).$readonly()],
       tsf.block([tsf.assign("this.message", tsf.this_())]),
     ),
-    tsf.method(
-      "greet",
-      [],
-      tsf.block([
-        tsf.call("console.log", [tsf.lit("Hello, world!")]),
-        tsf.ret(tsf.lit("done")),
-      ]),
-      [tsf.$mod.async()],
-    ),
+    tsf
+      .method(
+        "greet",
+        [],
+        tsf.block([
+          tsf.call("console.log", [tsf.lit("Hello, world!")]),
+          tsf.ret(tsf.lit("done")),
+        ]),
+      )
+      .$async(),
   ])
   .$export();
 

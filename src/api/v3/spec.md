@@ -22,18 +22,26 @@ export namespace tsf {
   export const prop = (
     name: string,
     type?: ts.TypeNode,
-    mods?: ts.ModifierLike[],
+    optiona?: boolean,
   ): ts.PropertyDeclaration => {
+    throw new NotImplemented();
+  };
+
+  export const param = (
+    name: string,
+    type?: ts.TypeNode,
+    optional?: boolean,
+  ): ts.ParameterDeclaration => {
     throw new NotImplemented();
   };
 
   export const method = (
     name: string,
-    args: { name: string; type?: ts.TypeNode }[],
+    args: (ts.ParameterDeclaration)[],
     body: ts.Block,
     mods?: ts.ModifierLike[],
   ): ts.MethodDeclaration => {
-    throw new NotImplemented();
+    // Implemented in core/method.ts
   };
 
   export const ctor = (
@@ -48,13 +56,13 @@ export namespace tsf {
 
   // #region Statements
   export const block = (stmts: (ts.Statement | ts.Expression)[]): ts.Block => {
-    throw new NotImplemented();
+    // Implemented in core/block.ts
   };
   export const exprStmt = (expr: ts.Expression): ts.ExpressionStatement => {
     throw new NotImplemented();
   };
   export const ret = (expr?: ts.Expression): ts.ReturnStatement => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
   // #endregion
 
@@ -63,29 +71,29 @@ export namespace tsf {
     fn: string | ts.Expression,
     args: ts.Expression[],
   ): ts.CallExpression => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
 
   export const assign = (
     lhs: string | ts.Expression,
     rhs: ts.Expression,
   ): ts.BinaryExpression => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
 
   export const this_ = (): ts.ThisExpression => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
 
   export const super_ = (): ts.SuperExpression => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
 
   // #endregion
 
   // #region Literals
   export const lit = (value: string | number | boolean): ts.Expression => {
-    throw new NotImplemented();
+    // Implemented in core/tokens.ts
   };
   // #endregion
 
