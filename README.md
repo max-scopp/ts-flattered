@@ -9,6 +9,15 @@ A lightweight TypeScript DSL for AST construction and code generation. Makes cod
 - **Simple API**: Clean, minimal interface with fluent chaining
 - **No Wrapper Types**: Direct access to TypeScript AST nodes
 
+
+## Why ts-flattered?
+
+- **Minimal boilerplate**: Flat API with concise helpers
+- **Readable & maintainable**: Clearly shows structure and intent
+- **Full TypeScript API access**: Use any `ts.factory` function alongside our DSL
+- **Future proof**: Compatible with TypeScript compiler updates
+- **Handles core codegen tasks**: Classes, functions, methods, properties, imports/exports, file management
+
 ## Installation
 
 ```bash
@@ -62,6 +71,19 @@ ts-flattered offers excellent performance with minimal overhead compared to raw 
 **ts-morph is 97x slower than ts-flattered** - While these are microsecond differences per operation, ts-morph's overhead becomes significant at scale (61.7ms extra per 100k operations vs ts-flattered's 1.7ms).
 
 **Choose based on developer experience**: ts-flattered's readability benefits outweigh the tiny performance cost for most applications.
+
+## Core API
+
+- **`sourceFile(name, statements)`** - Create a TypeScript file
+- **`klass(name, members?)`** - Create a class with optional members
+- **`method(name, params?, body?)`** - Create a method with optional params and body
+- **`prop(name, type?)`** - Create a property with optional type
+- **`param(name, type?)`** - Create a method parameter
+- **`block(statements)`** - Create a code block
+- **`call(functionName, args?)`** - Create a function call
+- **`$(value)`** - Create a string/identifier literal
+- **`assign(target, value)`** - Create an assignment expression
+- **`writeAll(opts)`** - Generate all files to disk
 
 ## Examples
 
@@ -148,27 +170,6 @@ const dogClass = ts.factory.createClassDeclaration(
 ```
 
 **ts-flattered: 90% less code + actually readable**
-
-## Core API
-
-- **`sourceFile(name, statements)`** - Create a TypeScript file
-- **`klass(name, members?)`** - Create a class with optional members
-- **`method(name, params?, body?)`** - Create a method with optional params and body
-- **`prop(name, type?)`** - Create a property with optional type
-- **`param(name, type?)`** - Create a method parameter
-- **`block(statements)`** - Create a code block
-- **`call(functionName, args?)`** - Create a function call
-- **`$(value)`** - Create a string/identifier literal
-- **`assign(target, value)`** - Create an assignment expression
-- **`writeAll(opts)`** - Generate all files to disk
-
-## Why ts-flattered?
-
-- **Minimal boilerplate**: Flat API with concise helpers
-- **Readable & maintainable**: Clearly shows structure and intent
-- **Full TypeScript API access**: Use any `ts.factory` function alongside our DSL
-- **Future proof**: Compatible with TypeScript compiler updates
-- **Handles core codegen tasks**: Classes, functions, methods, properties, imports/exports, file management
 
 ## License
 
