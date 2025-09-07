@@ -6,6 +6,10 @@
     "email": "me@maxscopp.de"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-scopp/ts-flattered.git"
+  },
   "main": "dist/ts-flattered.js",
   "module": "dist/ts-flattered.js",
   "types": "dist/types/index.d.ts",
