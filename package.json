@@ -6,7 +6,17 @@
     "email": "me@maxscopp.de"
   },
   "license": "MIT",
-  "module": "src/index.ts",
+  "main": "dist/ts-flattered.js",
+  "module": "dist/ts-flattered.js",
+  "types": "dist/types/index.d.ts",
+  "typings": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/ts-flattered.js",
+      "default": "./dist/ts-flattered.js"
+    }
+  },
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
@@ -18,10 +28,16 @@
   "optionalDependencies": {
     "ts-morph": "^26.0.0"
   },
-  "dependencies": {
+  "peerDependencies": {
     "typescript": ">=5.9.2"
   },
   "scripts": {
-    "release": "npm version patch && bun --outfile=dist/ts-flattered.js src/index.ts && git add . && git commit -m 'chore(release): release new version' && git push && git push --tags"
+    "build": "bun run clean && bun run build:types && bun run build:js",
+    "build:types": "tsc",
+    "build:js": "bun build src/index.ts --outfile dist/ts-flattered.js --external typescript --target bun --format esm --minify",
+    "dev": "bun build src/index.ts --outfile dist/ts-flattered.js --watch --external typescript --target bun --format esm",
+    "clean": "rm -rf dist",
+    "prebuild": "mkdir -p dist",
+    "release": "npm version patch && bun run build && git add . && git commit -m 'chore(release): release new version' && git push && git push --tags"
   }
 }
