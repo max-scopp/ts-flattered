@@ -1,17 +1,4 @@
-import {
-  $,
-  assign,
-  block,
-  call,
-  ctor,
-  klass,
-  method,
-  param,
-  prop,
-  ret,
-  this_,
-} from "../src/api/v3/public_api";
-import { $string } from "../src/api/v3/types";
+import { $, $string, assign, block, call, ctor, klass, method, param, prop, ret, this_ } from "../src";
 import { runPerformanceTest } from "./test_utils";
 
 // Example 2: Chainable Style

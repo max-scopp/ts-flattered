@@ -1,13 +1,27 @@
 {
   "name": "ts-flattered",
+  "version": "0.1.0",
+  "author": {
+    "name": "Max Scopp",
+    "email": "me@maxscopp.de"
+  },
+  "license": "MIT",
   "module": "src/index.ts",
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
-    "@types/bun": "latest",
+    "@types/bun": "latest"
+  },
+  "files": [
+    "dist"
+  ],
+  "optionalDependencies": {
     "ts-morph": "^26.0.0"
   },
   "dependencies": {
-    "typescript": "^5.9.2"
+    "typescript": ">=5.9.2"
+  },
+  "scripts": {
+    "release": "npm version patch && bun --outfile=dist/ts-flattered.js src/index.ts && git add . && git commit -m 'chore(release): release new version' && git push && git push --tags"
   }
 }

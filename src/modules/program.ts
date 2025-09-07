@@ -1,5 +1,5 @@
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import ts from "typescript";
 import { SourceFile } from "./file";
 import { type ExternalDependency, SourceFileRegistry } from "./registry";

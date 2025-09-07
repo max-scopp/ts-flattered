@@ -1,4 +1,5 @@
-# ts-flattered
+<center><img src="banner.webp" width="320px"/></center>
+<br/>
 
 A lightweight TypeScript DSL for AST construction and code generation. Makes code generation **readable, concise, and easy to write**, reducing boilerplate compared `ts.factory` and improves performance compared to `ts-morph`.
 

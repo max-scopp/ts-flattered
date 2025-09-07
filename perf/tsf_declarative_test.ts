@@ -10,8 +10,8 @@ import {
   prop,
   ret,
   this_,
-} from "../src/api/v3/public_api";
-import { $string } from "../src/api/v3/types";
+} from "../src/public_api";
+import { $string } from "../src/types";
 import { runPerformanceTest } from "./test_utils";
 
 // Example 1: Initial Declaration Style (from example.ts)
