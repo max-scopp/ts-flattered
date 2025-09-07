@@ -23,7 +23,8 @@
     "@types/bun": "latest"
   },
   "files": [
-    "dist"
+    "dist",
+    "banner.webp"
   ],
   "optionalDependencies": {
     "ts-morph": "^26.0.0"
