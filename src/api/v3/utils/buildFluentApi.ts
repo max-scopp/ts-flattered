@@ -26,40 +26,24 @@ export function buildFluentApi<
 ): TBuilder & ReturnType<TBuilder["get"]> {
   const builder = new BuilderClass(options);
 
-  // Proxy that gets the current AST node on each access
-  const proxy = new Proxy(builder, {
+  return new Proxy(builder, {
     get(target, prop, receiver) {
-      // First check if it's a builder method/property
-      const builderValue = Reflect.get(target, prop, receiver);
-
-      // If it's a method on the builder, wrap it to ensure fluent chaining returns the proxy
-      if (typeof builderValue === "function") {
-        return (...args: unknown[]) => {
-          const result = builderValue.apply(target, args);
-          // If the method returns the builder (for fluent chaining), return the proxy instead
-          if (result === target) {
-            return receiver;
-          }
-          return result;
-        };
-      }
-
-      // If it's a builder property, return it
+      // Check builder first (fastest path)
+      const builderValue = (target as Record<string | symbol, unknown>)[prop];
       if (builderValue !== undefined) {
+        // If it's a method, wrap for fluent chaining
+        if (typeof builderValue === "function") {
+          return (...args: unknown[]) => {
+            const result = builderValue.apply(target, args);
+            return result === target ? receiver : result;
+          };
+        }
         return builderValue;
       }
 
-      // Fallback to AST node properties only if not found on builder
+      // Fallback to AST node properties
       const currentNode = target.get();
-      if (prop in currentNode) {
-        return (currentNode as unknown as Record<string | symbol, unknown>)[
-          prop
-        ];
-      }
-
-      return builderValue;
+      return (currentNode as unknown as Record<string | symbol, unknown>)[prop];
     },
-  });
-
-  return proxy as TBuilder & ReturnType<TBuilder["get"]>;
+  }) as TBuilder & ReturnType<TBuilder["get"]>;
 }

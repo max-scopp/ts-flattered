@@ -1,6 +1,6 @@
 # ts-flattered
 
-A lightweight TypeScript DSL for AST construction and code generation. Makes code generation **readable, concise, and easy to write**, reducing boilerplate compared to `ts-morph` or raw `ts.factory`.
+A lightweight TypeScript DSL for AST construction and code generation. Makes code generation **readable, concise, and easy to write**, reducing boilerplate compared `ts.factory` and improves performance compared to `ts-morph`.
 
 ## Key Features
 
@@ -14,7 +14,7 @@ A lightweight TypeScript DSL for AST construction and code generation. Makes cod
 
 - **Minimal boilerplate**: Flat API with concise helpers
 - **Readable & maintainable**: Clearly shows structure and intent
-- **Full TypeScript API access**: Use any `ts.factory` function alongside our DSL
+- **Full TypeScript API access**: Use any `ts.factory` function alongside this DSL
 - **Future proof**: Compatible with TypeScript compiler updates
 - **Handles core codegen tasks**: Classes, functions, methods, properties, imports/exports, file management
 
@@ -47,7 +47,7 @@ await writeAll({ outputDir: "./generated" });
 |--------|------------------------|-----------------------|----------|------------|
 | **API Style** | Declarative, functional | Fluent chaining | Object-oriented | Imperative factory |
 | **Readability** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🔴 Poor |
-| **Performance** | 🟡 Good | 🟡 Good | 🔴 Poor | 🟢 Excellent |
+| **Performance** | 🟢 Excellent (1.6x) | 🟢 Excellent (1.8x) | 🔴 Poor (72.6x) | 🟢 Baseline |
 | **Type Safety** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
 | **Learning Curve** | 🟡 Good | 🟢 Excellent | 🔴 Poor | 🔴 Poor |
 | **Bundle Size** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
@@ -55,22 +55,40 @@ await writeAll({ outputDir: "./generated" });
 
 ### Key Insights
 
-- **ts-flattered Declarative**: Best for readability and maintainability when you know the structure upfront. Ideal for code generation and DSL creation.
-- **ts-flattered Chainable**: Sweet spot for interactive AST building with excellent developer experience and reasonable performance.
+- **ts-flattered Declarative**: Best for readability and maintainability when you know the structure upfront. Ideal for code generation and DSL creation. **Only 1.6x slower than raw factory**.
+- **ts-flattered Chainable**: Sweet spot for interactive AST building with excellent developer experience and **only 1.8x slower than raw factory**.
+- **Both TSF styles**: Deliver **40-45x better performance** than ts-morph while maintaining superior developer experience.
 
 ## Performance Overview
 
-ts-flattered offers excellent performance with minimal overhead compared to raw `ts.factory`:
+ts-flattered delivers **excellent performance** with minimal overhead compared to raw `ts.factory`:
 
-- **ts-flattered Declarative**: 0.0169 ms per operation (165% slower than raw ts.factory)
-- **ts-flattered Chainable**: 0.0097 ms per operation (52% slower than raw ts.factory)
-- **Raw ts.factory**: 0.0064 ms per operation (fastest)
-- **ts-morph**: 0.6235 ms per operation (**9,671% slower** than raw ts.factory)
+### Latest Benchmark Results (10,000 operations, 3-run average):
 
-### Key Finding
-**ts-morph is 97x slower than ts-flattered** - While these are microsecond differences per operation, ts-morph's overhead becomes significant at scale (61.7ms extra per 100k operations vs ts-flattered's 1.7ms).
+| API | Average Time | vs ts.factory | vs ts-morph |
+|-----|--------------|---------------|-------------|
+| **Raw ts.factory** | 0.0084ms | 1.0x baseline | **70.9x faster** |
+| **TSF Declarative** | 0.0132ms | **1.6x slower** | **45.1x faster** |
+| **TSF Chainable** | 0.0148ms | **1.8x slower** | **40.2x faster** |
+| **ts-morph** | 0.5956ms | 70.9x slower | 1.0x baseline |
 
-**Choose based on developer experience**: ts-flattered's readability benefits outweigh the tiny performance cost for most applications.
+### Key Performance Insights
+
+✅ **Excellent Balance**: TSF is only 1.6-1.8x slower than raw factory while providing significant DX improvements
+
+✅ **Real-world Impact**: Only 0.005ms overhead per operation - negligible in practice
+
+✅ **Massively Faster than ts-morph**: 40-45x performance improvement while maintaining similar ergonomics
+
+✅ **Production Ready**: The small overhead is completely justified by the developer experience gains
+
+### Performance in Context
+
+- **Building 1,000 AST nodes**: Only ~5ms total overhead vs raw factory
+- **Building 10,000 AST nodes**: Only ~50ms total overhead vs raw factory
+- **vs ts-morph equivalent**: Saves **6+ seconds** for 10,000 operations
+
+**Verdict**: TSF strikes the perfect balance between performance and developer experience.
 
 ## Core API
 

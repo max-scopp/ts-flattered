@@ -11,7 +11,7 @@
       "name": "Debug Example",
       "program": "src/api/v3/example.ts",
       "cwd": "${workspaceFolder}",
-      "stopOnEntry": false,
+      "stopOnEntry": true,
       "watchMode": false
     },
 
