@@ -49,7 +49,7 @@ await writeAll({ outputDir: "./generated" });
 | **Readability** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🔴 Poor |
 | **Performance** | 🟢 Excellent (1.6x) | 🟢 Excellent (1.8x) | 🔴 Poor (72.6x) | 🟢 Baseline |
 | **Type Safety** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
-| **Learning Curve** | 🟡 Good | 🟢 Excellent | 🔴 Poor | 🔴 Poor |
+| **Learning Curve** | 🟡 Good | 🟢 Excellent | 🟡 Good | 🔴 Poor |
 | **Bundle Size** | 🟢 Excellent | 🟢 Excellent | 🟡 Good | 🟢 Excellent |
 | **Use Case** | Code generation, DSLs | Interactive building | Source analysis/modification | Low-level AST work |
 
