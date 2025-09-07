@@ -37,7 +37,7 @@ import {
   union,
   var_,
   while_,
-} from "./public_api";
+} from "../src/public_api";
 
 // Helper function to generate source code from AST nodes
 function generateSourceCode(nodes: ts.Statement[]): string {

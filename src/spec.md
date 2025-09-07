@@ -14,7 +14,6 @@ export namespace tsf {
     name: string,
     args: { name: string; type?: ts.TypeNode }[],
     body: ts.Block,
-    mods?: ts.ModifierLike[],
   ): ts.FunctionDeclaration => {
     throw new NotImplemented();
   };
@@ -39,7 +38,6 @@ export namespace tsf {
     name: string,
     args: (ts.ParameterDeclaration)[],
     body: ts.Block,
-    mods?: ts.ModifierLike[],
   ): ts.MethodDeclaration => {
     // Implemented in core/method.ts
   };
@@ -47,7 +45,6 @@ export namespace tsf {
   export const ctor = (
     args: { name: string; type?: ts.TypeNode }[],
     body: ts.Block,
-    mods?: ts.ModifierLike[],
   ): ts.ConstructorDeclaration => {
     throw new NotImplemented();
   };

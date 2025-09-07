@@ -11,8 +11,8 @@ import {
   prop,
   ret,
   this_,
-} from "./public_api";
-import { $string } from "./types";
+} from "../src/public_api";
+import { $string } from "../src/types";
 
 const greeter = klass("Greeter", [
   prop("message", $string()).$readonly(),
