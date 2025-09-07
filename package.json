@@ -37,7 +37,6 @@
     "build:js": "bun build src/index.ts --outfile dist/ts-flattered.js --external typescript --target bun --format esm --minify",
     "dev": "bun build src/index.ts --outfile dist/ts-flattered.js --watch --external typescript --target bun --format esm",
     "clean": "rm -rf dist",
-    "prebuild": "mkdir -p dist",
-    "release": "bun run build && git add . && git commit -m 'chore(release): release new version' && git push"
+    "prebuild": "mkdir -p dist"
   }
 }

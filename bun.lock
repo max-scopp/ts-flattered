@@ -3,13 +3,15 @@
   "workspaces": {
     "": {
       "name": "ts-flattered",
-      "dependencies": {
-        "typescript": "^5.9.2",
-      },
       "devDependencies": {
         "@biomejs/biome": "2.2.2",
         "@types/bun": "latest",
+      },
+      "optionalDependencies": {
         "ts-morph": "^26.0.0",
+      },
+      "peerDependencies": {
+        "typescript": ">=5.9.2",
       },
     },
   },
