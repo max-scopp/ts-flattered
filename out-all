@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-bun examples/advanced-example.ts
-bun examples/basic-example.ts
-bun examples/registry-example.ts
-bun examples/angular-petstore-example.ts
