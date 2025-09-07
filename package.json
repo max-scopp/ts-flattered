@@ -6,9 +6,28 @@
     "email": "me@maxscopp.de"
   },
   "license": "MIT",
+  "keywords": [
+    "typescript",
+    "ast",
+    "code-generation",
+    "dsl",
+    "metaprogramming",
+    "compiler",
+    "transformer",
+    "build-tools",
+    "codegen"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/max-scopp/ts-flattered.git"
+  },
+  "homepage": "https://github.com/max-scopp/ts-flattered#readme",
+  "description": "Readable ASTs, flatter code. A lightweight TypeScript DSL for AST construction and code generation",
+  "bugs": {
+    "url": "https://github.com/max-scopp/ts-flattered/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "main": "dist/ts-flattered.js",
   "module": "dist/ts-flattered.js",
