@@ -56,11 +56,9 @@
     "typescript": ">=5.9.2"
   },
   "scripts": {
-    "build": "bun run clean && bun run build:types && bun run build:js",
-    "build:types": "tsc",
-    "build:js": "bun build src/index.ts --outfile dist/ts-flattered.js --external typescript --target bun --format esm --minify",
-    "dev": "bun build src/index.ts --outfile dist/ts-flattered.js --watch --external typescript --target bun --format esm",
-    "clean": "rm -rf dist",
-    "prebuild": "mkdir -p dist"
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "tsdown": "^0.15.1"
   }
 }
