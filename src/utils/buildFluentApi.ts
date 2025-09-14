@@ -4,7 +4,7 @@ import type ts from "typescript";
  * Generic interface for any builder that can produce a TS AST node
  */
 export interface BuildableAST {
-  get(): ts.Node;
+  get(): ts.Node | ts.Program;
 }
 
 /**
