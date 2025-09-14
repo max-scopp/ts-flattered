@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { extractDecoratorInfo } from "../core/decorator";
+import { getImportModule } from "./moduleResolver";
 
 /**
  * Information about a decorator
@@ -42,6 +43,88 @@ export interface ClassMethodInfo {
 }
 
 /**
+ * Options for filtering decorators
+ */
+export interface DecoratorFilterOptions {
+  /** Filter by decorator name (exact match) */
+  name?: string;
+  /** Filter by decorator name using regex pattern */
+  nameRegex?: RegExp;
+  /** Filter by module from which the decorator was imported */
+  module?: string;
+  /** Filter by module using regex pattern */
+  moduleRegex?: RegExp;
+  /** Source file containing the decorators (required for module filtering) */
+  sourceFile: ts.SourceFile;
+}
+
+/**
+ * Options for filtering methods
+ */
+export interface MethodFilterOptions {
+  /** Filter by method name (exact match) */
+  name?: string;
+  /** Filter by method name using regex pattern */
+  nameRegex?: RegExp;
+  /** Filter by visibility */
+  isPrivate?: boolean;
+  /** Filter by static modifier */
+  isStatic?: boolean;
+  /** Filter by decorators */
+  decorators?: {
+    /** Filter by decorator name (exact match) */
+    name?: string;
+    /** Filter by decorator name using regex pattern */
+    nameRegex?: RegExp;
+    /** Filter by module from which the decorator was imported */
+    module?: string;
+    /** Filter by module using regex pattern */
+    moduleRegex?: RegExp;
+  };
+  /** Source file containing the methods (required for decorator module filtering) */
+  sourceFile?: ts.SourceFile;
+}
+
+/**
+ * Options for filtering properties
+ */
+export interface PropertyFilterOptions {
+  /** Filter by property name (exact match) */
+  name?: string;
+  /** Filter by property name using regex pattern */
+  nameRegex?: RegExp;
+  /** Filter by visibility */
+  isPrivate?: boolean;
+  /** Filter by static modifier */
+  isStatic?: boolean;
+  /** Filter by readonly modifier */
+  isReadonly?: boolean;
+  /** Filter by decorators */
+  decorators?: {
+    /** Filter by decorator name (exact match) */
+    name?: string;
+    /** Filter by decorator name using regex pattern */
+    nameRegex?: RegExp;
+    /** Filter by module from which the decorator was imported */
+    module?: string;
+    /** Filter by module using regex pattern */
+    moduleRegex?: RegExp;
+  };
+  /** Source file containing the properties (required for decorator module filtering) */
+  sourceFile?: ts.SourceFile;
+}
+
+/**
+ * Options for filtering parameters
+ */
+export interface ParameterFilterOptions {
+  /** Filter by parameter name (exact match) */
+  name?: string;
+  /** Filter by parameter name using regex pattern */
+  nameRegex?: RegExp;
+}
+
+/**
  * Find all class declarations in a source file
  * @param sourceFile The source file to search in
  * @returns Array of class declarations
@@ -78,28 +161,62 @@ export function findClass(sourceFile: ts.SourceFile, name: string): ts.ClassDecl
 
 /**
  * Find decorators for a specific node (class, property, method, etc.)
- * @param sourceFile The source file containing the node
  * @param node The node to find decorators for
+ * @param options Optional filtering options
  * @returns Array of decorators or empty array if none found
  */
-export function findDecorators(sourceFile: ts.SourceFile, node: ts.Node): ts.Decorator[] {
+export function findDecorators(node: ts.Node, options?: DecoratorFilterOptions): ts.Decorator[] {
+  // TypeScript stores decorators in the 'decorators' property (older versions)
+  // or as part of 'modifiers' (newer versions)
   const decorators: ts.Decorator[] = [];
 
-  // Simple AST traversal to find decorators
-  function visit(n: ts.Node) {
-    if (ts.isDecorator(n)) {
-      // Check if this decorator belongs to our target node
-      // A decorator is a child of the node it decorates
-      if (n.parent === node) {
-        decorators.push(n);
-      }
-    }
-    ts.forEachChild(n, visit);
+  // Check if the node has decorators property (legacy)
+  if ('decorators' in node && node.decorators) {
+    decorators.push(...(node.decorators as ts.Decorator[]));
   }
 
-  // Start from the source file or the node itself to find its decorator children
-  // We need to traverse from the source file to find all decorators
-  ts.forEachChild(sourceFile, visit);
+  // Check modifiers for decorators (modern approach)
+  if ('modifiers' in node && node.modifiers) {
+    const modifiers = node.modifiers as readonly ts.ModifierLike[];
+    for (const modifier of modifiers) {
+      if (ts.isDecorator(modifier)) {
+        decorators.push(modifier);
+      }
+    }
+  }
+
+  // Apply filters if options are provided
+  if (options) {
+    return decorators.filter(decorator => {
+      const decoratorInfo = extractDecoratorInfo(decorator);
+      const decoratorName = decoratorInfo.name;
+
+      // Filter by exact name
+      if (options.name && decoratorName !== options.name) {
+        return false;
+      }
+
+      // Filter by name regex
+      if (options.nameRegex && !options.nameRegex.test(decoratorName)) {
+        return false;
+      }
+
+      // Filter by module (requires checking import statements)
+      if (options.module || options.moduleRegex) {
+        const importModule = getImportModule(decoratorName, options.sourceFile);
+
+        if (options.module && importModule !== options.module) {
+          return false;
+        }
+
+        if (options.moduleRegex && (!importModule || !options.moduleRegex.test(importModule))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
 
   return decorators;
 }
@@ -121,6 +238,187 @@ export function getDecoratorInfo(decorator: ts.Decorator): DecoratorInfo {
 }
 
 /**
+ * Find all methods of a class
+ * @param classDeclaration The class declaration to analyze
+ * @param options Optional filtering options
+ * @returns Array of method declarations
+ */
+export function findMethods(classDeclaration: ts.ClassDeclaration, options?: MethodFilterOptions): ts.MethodDeclaration[] {
+  const methods: ts.MethodDeclaration[] = [];
+
+  for (const member of classDeclaration.members) {
+    if (ts.isMethodDeclaration(member)) {
+      methods.push(member);
+    }
+  }
+
+  // Apply filters if options are provided
+  if (options) {
+    return methods.filter(method => {
+      const methodName = ts.isIdentifier(method.name) ? method.name.text : 'unknown';
+
+      // Filter by exact name
+      if (options.name && methodName !== options.name) {
+        return false;
+      }
+
+      // Filter by name regex
+      if (options.nameRegex && !options.nameRegex.test(methodName)) {
+        return false;
+      }
+
+      // Filter by private modifier
+      if (options.isPrivate !== undefined) {
+        const isPrivate = !!method.modifiers?.some(m => m.kind === ts.SyntaxKind.PrivateKeyword);
+        if (options.isPrivate !== isPrivate) {
+          return false;
+        }
+      }
+
+      // Filter by static modifier
+      if (options.isStatic !== undefined) {
+        const isStatic = !!method.modifiers?.some(m => m.kind === ts.SyntaxKind.StaticKeyword);
+        if (options.isStatic !== isStatic) {
+          return false;
+        }
+      }
+
+      // Filter by decorators
+      if (options.decorators) {
+        const decoratorOptions: DecoratorFilterOptions | undefined = options.sourceFile ? {
+          name: options.decorators.name,
+          nameRegex: options.decorators.nameRegex,
+          module: options.decorators.module,
+          moduleRegex: options.decorators.moduleRegex,
+          sourceFile: options.sourceFile
+        } : undefined;
+
+        const decorators = findDecorators(method, decoratorOptions);
+
+        // If we're filtering by decorators but none match, exclude this method
+        if (decorators.length === 0) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  return methods;
+}
+
+/**
+ * Find all parameters of a method or function
+ * @param method The method or function declaration to analyze
+ * @param options Optional filtering options
+ * @returns Array of parameter declarations
+ */
+export function findParameters(method: ts.MethodDeclaration | ts.FunctionDeclaration | ts.ConstructorDeclaration, options?: ParameterFilterOptions): ts.ParameterDeclaration[] {
+  const parameters = [...method.parameters];
+
+  // Apply filters if options are provided
+  if (options) {
+    return parameters.filter(param => {
+      const paramName = ts.isIdentifier(param.name) ? param.name.text : 'unknown';
+
+      // Filter by exact name
+      if (options.name && paramName !== options.name) {
+        return false;
+      }
+
+      // Filter by name regex
+      if (options.nameRegex && !options.nameRegex.test(paramName)) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  return parameters;
+}
+
+/**
+ * Find all properties of a class
+ * @param classDeclaration The class declaration to analyze
+ * @param options Optional filtering options
+ * @returns Array of property declarations
+ */
+export function findProperties(classDeclaration: ts.ClassDeclaration, options?: PropertyFilterOptions): ts.PropertyDeclaration[] {
+  const properties: ts.PropertyDeclaration[] = [];
+
+  for (const member of classDeclaration.members) {
+    if (ts.isPropertyDeclaration(member)) {
+      properties.push(member);
+    }
+  }
+
+  // Apply filters if options are provided
+  if (options) {
+    return properties.filter(property => {
+      const propertyName = ts.isIdentifier(property.name) ? property.name.text : 'unknown';
+
+      // Filter by exact name
+      if (options.name && propertyName !== options.name) {
+        return false;
+      }
+
+      // Filter by name regex
+      if (options.nameRegex && !options.nameRegex.test(propertyName)) {
+        return false;
+      }
+
+      // Filter by private modifier
+      if (options.isPrivate !== undefined) {
+        const isPrivate = !!property.modifiers?.some(m => m.kind === ts.SyntaxKind.PrivateKeyword);
+        if (options.isPrivate !== isPrivate) {
+          return false;
+        }
+      }
+
+      // Filter by static modifier
+      if (options.isStatic !== undefined) {
+        const isStatic = !!property.modifiers?.some(m => m.kind === ts.SyntaxKind.StaticKeyword);
+        if (options.isStatic !== isStatic) {
+          return false;
+        }
+      }
+
+      // Filter by readonly modifier
+      if (options.isReadonly !== undefined) {
+        const isReadonly = !!property.modifiers?.some(m => m.kind === ts.SyntaxKind.ReadonlyKeyword);
+        if (options.isReadonly !== isReadonly) {
+          return false;
+        }
+      }
+
+      // Filter by decorators
+      if (options.decorators) {
+        const decoratorOptions: DecoratorFilterOptions | undefined = options.sourceFile ? {
+          name: options.decorators.name,
+          nameRegex: options.decorators.nameRegex,
+          module: options.decorators.module,
+          moduleRegex: options.decorators.moduleRegex,
+          sourceFile: options.sourceFile
+        } : undefined;
+
+        const decorators = findDecorators(property, decoratorOptions);
+
+        // If we're filtering by decorators but none match, exclude this property
+        if (decorators.length === 0) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  return properties;
+}
+
+/**
  * Find all properties of a class with their decorators
  * @param sourceFile The source file containing the class
  * @param classDeclaration The class declaration to analyze
@@ -132,7 +430,7 @@ export function getClassProperties(sourceFile: ts.SourceFile, classDeclaration: 
   for (const member of classDeclaration.members) {
     if (ts.isPropertyDeclaration(member)) {
       const propertyName = ts.isIdentifier(member.name) ? member.name.text : 'unknown';
-      const decorators = findDecorators(sourceFile, member).map(d => getDecoratorInfo(d));
+      const decorators = findDecorators(member).map(d => getDecoratorInfo(d));
 
       properties.push({
         name: propertyName,
@@ -160,7 +458,7 @@ export function getClassMethods(sourceFile: ts.SourceFile, classDeclaration: ts.
   for (const member of classDeclaration.members) {
     if (ts.isMethodDeclaration(member)) {
       const methodName = ts.isIdentifier(member.name) ? member.name.text : 'unknown';
-      const decorators = findDecorators(sourceFile, member).map(d => getDecoratorInfo(d));
+      const decorators = findDecorators(member).map(d => getDecoratorInfo(d));
 
       methods.push({
         name: methodName,
@@ -169,7 +467,7 @@ export function getClassMethods(sourceFile: ts.SourceFile, classDeclaration: ts.
         isStatic: !!member.modifiers?.some(m => m.kind === ts.SyntaxKind.StaticKeyword),
         parameters: member.parameters.map(param => {
           const paramName = ts.isIdentifier(param.name) ? param.name.text : 'unknown';
-          const paramDecorators = findDecorators(sourceFile, param).map(d => getDecoratorInfo(d));
+          const paramDecorators = findDecorators(param).map(d => getDecoratorInfo(d));
           return {
             name: paramName,
             decorators: paramDecorators,
