@@ -29,15 +29,15 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "main": "dist/ts-flattered.js",
-  "module": "dist/ts-flattered.js",
-  "types": "dist/types/index.d.ts",
-  "typings": "dist/types/index.d.ts",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/ts-flattered.js",
-      "default": "./dist/ts-flattered.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "type": "module",
