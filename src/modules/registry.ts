@@ -24,7 +24,7 @@ export class SourceFileRegistry {
   private externalDependencies = new Map<string, ExternalDependency>();
 
   register(sourceFile: SourceFile): void {
-    this.files.set(sourceFile.fileName, sourceFile);
+    this.files.set(sourceFile.getFileName(), sourceFile);
   }
 
   unregister(fileName: string): void {

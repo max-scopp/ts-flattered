@@ -43,6 +43,7 @@
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
+    "@types/babel__code-frame": "~7.0.6",
     "@types/bun": "latest"
   },
   "files": [
@@ -59,6 +60,7 @@
     "build": "tsdown"
   },
   "dependencies": {
+    "@babel/code-frame": "^7.27.1",
     "tsdown": "^0.15.1"
   }
 }

@@ -12,6 +12,7 @@ export * from "./core/prop";
 export * from "./core/stmt";
 export * from "./core/tokens";
 export * from "./core/variable";
+export * from "./helpers/highlight";
 export * from "./modules/file";
 export * from "./modules/imp";
 export * from "./modules/print";

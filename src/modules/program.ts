@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript";
-import { SourceFile } from "./file";
+import { file, type SourceFile } from "./file";
 import { type ExternalDependency, SourceFileRegistry } from "./registry";
 
 /**
@@ -15,7 +15,7 @@ export class Program {
    * Create a new source file and register it with the program
    */
   createSourceFile(fileName: string): SourceFile {
-    const sourceFile = new SourceFile(fileName);
+    const sourceFile = file(fileName);
     this.registry.register(sourceFile);
     return sourceFile;
   }
@@ -125,7 +125,7 @@ export class Program {
     currentFileName: string,
   ): SourceFile {
     // Create a copy of the source file to avoid modifying the original
-    const resolvedFile = new SourceFile(currentFileName);
+    const resolvedFile = file(currentFileName);
 
     // Get all statements from the original file
     const statements = sourceFile.getStatements();
