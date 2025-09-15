@@ -9,7 +9,7 @@ import type {
 } from "../helpers/finder";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { type ImportOptions, imp } from "./imp";
-import { print } from "./print";
+import { type PostprocessOptions, type PrintOptions, print } from "./print";
 
 /**
  * Type representing a SourceFile with the fluent API methods
@@ -52,7 +52,10 @@ export interface VariableOptions {
 
 // Re-export types from helpers
 export type {
-  ClassMethodInfo, ClassPropertyInfo, DecoratorInfo, ParameterInfo
+  ClassMethodInfo,
+  ClassPropertyInfo,
+  DecoratorInfo,
+  ParameterInfo,
 };
 
 /**
@@ -152,7 +155,11 @@ class FileBuilder implements BuildableAST {
    * Updates existing classes in the source file using a callback function
    * The callback receives a klass builder for each class and should return the modified class
    */
-  updateClasses(updateFn: (classBuilder: ReturnType<typeof klass>) => ReturnType<typeof klass>) {
+  updateClasses(
+    updateFn: (
+      classBuilder: ReturnType<typeof klass>,
+    ) => ReturnType<typeof klass>,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isClassDeclaration(statement)) {
         // Create a klass builder for the existing class
@@ -184,7 +191,12 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific class by name in the source file
    */
-  updateClass(className: string, updateFn: (classBuilder: ReturnType<typeof klass>) => ReturnType<typeof klass>) {
+  updateClass(
+    className: string,
+    updateFn: (
+      classBuilder: ReturnType<typeof klass>,
+    ) => ReturnType<typeof klass>,
+  ) {
     return this.updateClasses((classBuilder) => {
       const classDecl = classBuilder.get();
       if (classDecl.name?.text === className) {
@@ -197,7 +209,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing functions in the source file using a callback function
    */
-  updateFunctions(updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration) {
+  updateFunctions(
+    updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isFunctionDeclaration(statement)) {
         return updateFn(statement);
@@ -224,7 +238,10 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific function by name in the source file
    */
-  updateFunction(functionName: string, updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration) {
+  updateFunction(
+    functionName: string,
+    updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration,
+  ) {
     return this.updateFunctions((statement) => {
       if (statement.name?.text === functionName) {
         return updateFn(statement);
@@ -236,7 +253,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing variable statements in the source file using a callback function
    */
-  updateVariableStatements(updateFn: (statement: ts.VariableStatement) => ts.VariableStatement) {
+  updateVariableStatements(
+    updateFn: (statement: ts.VariableStatement) => ts.VariableStatement,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isVariableStatement(statement)) {
         return updateFn(statement);
@@ -263,13 +282,16 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific variable by name in the source file
    */
-  updateVariable(variableName: string, updateFn: (statement: ts.VariableStatement) => ts.VariableStatement) {
+  updateVariable(
+    variableName: string,
+    updateFn: (statement: ts.VariableStatement) => ts.VariableStatement,
+  ) {
     return this.updateVariableStatements((statement) => {
       // Check if this variable statement contains the variable we're looking for
-      const hasVariable = statement.declarationList.declarations.some((decl) => 
-        ts.isIdentifier(decl.name) && decl.name.text === variableName
+      const hasVariable = statement.declarationList.declarations.some(
+        (decl) => ts.isIdentifier(decl.name) && decl.name.text === variableName,
       );
-      
+
       if (hasVariable) {
         return updateFn(statement);
       }
@@ -280,7 +302,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing interface declarations in the source file using a callback function
    */
-  updateInterfaces(updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration) {
+  updateInterfaces(
+    updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isInterfaceDeclaration(statement)) {
         return updateFn(statement);
@@ -307,7 +331,10 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific interface by name in the source file
    */
-  updateInterface(interfaceName: string, updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration) {
+  updateInterface(
+    interfaceName: string,
+    updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration,
+  ) {
     return this.updateInterfaces((statement) => {
       if (statement.name.text === interfaceName) {
         return updateFn(statement);
@@ -319,7 +346,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing type alias declarations in the source file using a callback function
    */
-  updateTypeAliases(updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration) {
+  updateTypeAliases(
+    updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isTypeAliasDeclaration(statement)) {
         return updateFn(statement);
@@ -346,7 +375,10 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific type alias by name in the source file
    */
-  updateTypeAlias(typeName: string, updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration) {
+  updateTypeAlias(
+    typeName: string,
+    updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration,
+  ) {
     return this.updateTypeAliases((statement) => {
       if (statement.name.text === typeName) {
         return updateFn(statement);
@@ -385,7 +417,10 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates a specific enum by name in the source file
    */
-  updateEnum(enumName: string, updateFn: (statement: ts.EnumDeclaration) => ts.EnumDeclaration) {
+  updateEnum(
+    enumName: string,
+    updateFn: (statement: ts.EnumDeclaration) => ts.EnumDeclaration,
+  ) {
     return this.updateEnums((statement) => {
       if (statement.name.text === enumName) {
         return updateFn(statement);
@@ -397,7 +432,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing import declarations in the source file using a callback function
    */
-  updateImports(updateFn: (statement: ts.ImportDeclaration) => ts.ImportDeclaration) {
+  updateImports(
+    updateFn: (statement: ts.ImportDeclaration) => ts.ImportDeclaration,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isImportDeclaration(statement)) {
         return updateFn(statement);
@@ -424,7 +461,9 @@ class FileBuilder implements BuildableAST {
   /**
    * Updates existing export declarations in the source file using a callback function
    */
-  updateExports(updateFn: (statement: ts.ExportDeclaration) => ts.ExportDeclaration) {
+  updateExports(
+    updateFn: (statement: ts.ExportDeclaration) => ts.ExportDeclaration,
+  ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isExportDeclaration(statement)) {
         return updateFn(statement);
@@ -453,7 +492,7 @@ class FileBuilder implements BuildableAST {
    */
   updateStatements<T extends ts.Statement>(
     filter: (statement: ts.Statement) => statement is T,
-    updateFn: (statement: T) => T
+    updateFn: (statement: T) => T,
   ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (filter(statement)) {
@@ -486,8 +525,11 @@ class FileBuilder implements BuildableAST {
     return this.#sourceFile.fileName;
   }
 
-  print(): string {
-    return print(this.#sourceFile);
+  print(
+    postprocess?: PostprocessOptions,
+    options?: PrintOptions,
+  ): Promise<string> {
+    return print(this.#sourceFile, postprocess, options);
   }
 
   get(): ts.SourceFile {

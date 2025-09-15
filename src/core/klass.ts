@@ -1,8 +1,11 @@
 import ts from "typescript";
-import { findDecorators, type DecoratorFilterOptions } from "../helpers/finder";
-import { buildFluentApi, type BuildableAST } from "../utils/buildFluentApi";
+import { type DecoratorFilterOptions, findDecorators } from "../helpers/finder";
+import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
+import { ctor as ctorBuilder } from "./ctor";
 import { fromDecorator } from "./decorator";
+import { method as methodBuilder } from "./method";
 import { $abstract, $export, $readonly } from "./modifier";
+import { prop } from "./prop";
 
 export class KlassBuilder implements BuildableAST {
   #decl: ts.ClassDeclaration;
@@ -28,7 +31,9 @@ export class KlassBuilder implements BuildableAST {
     } else {
       // Create new ClassDeclaration
       if (!name) {
-        throw new Error("name is required when not adopting from existing ClassDeclaration");
+        throw new Error(
+          "name is required when not adopting from existing ClassDeclaration",
+        );
       }
       this.#decl = ts.factory.createClassDeclaration(
         mods,
@@ -133,14 +138,16 @@ export class KlassBuilder implements BuildableAST {
    */
   updateDecorator(
     findCondition: (decorator: ts.Decorator) => boolean,
-    updateFn: (decorator: ReturnType<typeof fromDecorator>) => ReturnType<typeof fromDecorator>
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => ReturnType<typeof fromDecorator>,
   ): ReturnType<typeof fromDecorator> | undefined {
     if (!this.#decl.modifiers) {
       return undefined;
     }
 
     // Find the decorator using the condition
-    const decoratorModifier = this.#decl.modifiers.find(modifier => {
+    const decoratorModifier = this.#decl.modifiers.find((modifier) => {
       return ts.isDecorator(modifier) && findCondition(modifier);
     }) as ts.Decorator | undefined;
 
@@ -150,12 +157,12 @@ export class KlassBuilder implements BuildableAST {
 
     // Create a decorator builder from the existing decorator
     const decoratorBuilder = fromDecorator(decoratorModifier);
-    
+
     // Apply the update function
     const updatedDecorator = updateFn(decoratorBuilder);
 
     // Update the class with the new decorator
-    const updatedModifiers = this.#decl.modifiers.map(modifier => {
+    const updatedModifiers = this.#decl.modifiers.map((modifier) => {
       if (modifier === decoratorModifier) {
         return updatedDecorator.get();
       }
@@ -182,7 +189,9 @@ export class KlassBuilder implements BuildableAST {
    */
   updateDecoratorsByFilter(
     options: DecoratorFilterOptions,
-    updateFn: (decorator: ReturnType<typeof fromDecorator>) => ReturnType<typeof fromDecorator>
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => ReturnType<typeof fromDecorator>,
   ): Array<ReturnType<typeof fromDecorator>> {
     // Use findDecorators to get matching decorators
     const foundDecorators = findDecorators(this.#decl, options);
@@ -199,7 +208,7 @@ export class KlassBuilder implements BuildableAST {
       updatedDecorators.push(updatedDecorator);
 
       // Update the class with the new decorator
-      const updatedModifiers = this.#decl.modifiers!.map(modifier => {
+      const updatedModifiers = this.#decl.modifiers!.map((modifier) => {
         if (modifier === foundDecorator) {
           return updatedDecorator.get();
         }
@@ -227,7 +236,9 @@ export class KlassBuilder implements BuildableAST {
    */
   updateDecoratorByFilter(
     options: DecoratorFilterOptions,
-    updateFn: (decorator: ReturnType<typeof fromDecorator>) => ReturnType<typeof fromDecorator>
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => ReturnType<typeof fromDecorator>,
   ): ReturnType<typeof fromDecorator> | undefined {
     const results = this.updateDecoratorsByFilter(options, updateFn);
     return results.length > 0 ? results[0] : undefined;
@@ -245,16 +256,18 @@ export class KlassBuilder implements BuildableAST {
     name: string,
     sourceFile: ts.SourceFile,
     module: string | undefined,
-    updateFn: (decorator: ReturnType<typeof fromDecorator>) => ReturnType<typeof fromDecorator>
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => ReturnType<typeof fromDecorator>,
   ): ReturnType<typeof fromDecorator> | undefined {
-    const options: DecoratorFilterOptions = { 
+    const options: DecoratorFilterOptions = {
       name,
-      sourceFile
+      sourceFile,
     };
     if (module) {
       options.module = module;
     }
-    
+
     return this.updateDecoratorByFilter(options, updateFn);
   }
 
@@ -264,20 +277,368 @@ export class KlassBuilder implements BuildableAST {
    * @param updateFn Function that receives the existing decorator and returns the updated one
    * @returns The updated decorator builder or undefined if not found
    */
-  updateDecoratorByName(decoratorName: string, updateFn: (decorator: ReturnType<typeof fromDecorator>) => ReturnType<typeof fromDecorator>): ReturnType<typeof fromDecorator> | undefined {
-    return this.updateDecorator(
-      (decorator) => {
-        // Extract decorator name
-        let name = '';
-        if (ts.isCallExpression(decorator.expression) && ts.isIdentifier(decorator.expression.expression)) {
-          name = decorator.expression.expression.text;
-        } else if (ts.isIdentifier(decorator.expression)) {
-          name = decorator.expression.text;
-        }
-        return name === decoratorName;
-      },
-      updateFn
+  updateDecoratorByName(
+    decoratorName: string,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => ReturnType<typeof fromDecorator>,
+  ): ReturnType<typeof fromDecorator> | undefined {
+    return this.updateDecorator((decorator) => {
+      // Extract decorator name
+      let name = "";
+      if (
+        ts.isCallExpression(decorator.expression) &&
+        ts.isIdentifier(decorator.expression.expression)
+      ) {
+        name = decorator.expression.expression.text;
+      } else if (ts.isIdentifier(decorator.expression)) {
+        name = decorator.expression.text;
+      }
+      return name === decoratorName;
+    }, updateFn);
+  }
+
+  // ========== Property Update Methods ==========
+
+  /**
+   * Update a property on the class using a callback function with a flexible find condition
+   * @param findCondition Function to determine which property to update (returns true for the target property)
+   * @param updateFn Function that receives the existing property and returns the updated one
+   * @returns The updated property builder or undefined if not found
+   */
+  updateProperty(
+    findCondition: (property: ts.PropertyDeclaration) => boolean,
+    updateFn: (property: ReturnType<typeof prop>) => ReturnType<typeof prop>,
+  ): ReturnType<typeof prop> | undefined {
+    // Find the property using the condition
+    const propertyMember = this.#decl.members.find((member) => {
+      return ts.isPropertyDeclaration(member) && findCondition(member);
+    }) as ts.PropertyDeclaration | undefined;
+
+    if (!propertyMember) {
+      return undefined;
+    }
+
+    // Create a property builder from the existing property
+    const propertyBuilder = prop(
+      ts.isIdentifier(propertyMember.name)
+        ? propertyMember.name.text
+        : propertyMember.name!.getText(),
+      propertyMember.type,
+      !!propertyMember.questionToken,
     );
+
+    // Apply existing modifiers
+    if (propertyMember.modifiers) {
+      propertyMember.modifiers.forEach((mod) => {
+        if (ts.isModifier(mod)) {
+          propertyBuilder.$mod(mod);
+        }
+      });
+    }
+
+    // Apply existing initializer
+    if (propertyMember.initializer) {
+      propertyBuilder.$init(propertyMember.initializer);
+    }
+
+    // Apply the update function
+    const updatedProperty = updateFn(propertyBuilder);
+
+    // Update the class with the new property
+    const updatedMembers = this.#decl.members.map((member) => {
+      if (member === propertyMember) {
+        return updatedProperty.get();
+      }
+      return member;
+    });
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      updatedMembers,
+    );
+
+    return updatedProperty;
+  }
+
+  /**
+   * Convenience method: Update property by name
+   * @param propertyName The name of the property to update
+   * @param updateFn Function that receives the existing property and returns the updated one
+   * @returns The updated property builder or undefined if not found
+   */
+  updatePropertyByName(
+    propertyName: string,
+    updateFn: (property: ReturnType<typeof prop>) => ReturnType<typeof prop>,
+  ): ReturnType<typeof prop> | undefined {
+    return this.updateProperty((property) => {
+      if (ts.isIdentifier(property.name)) {
+        return property.name.text === propertyName;
+      }
+      return property.name?.getText() === propertyName;
+    }, updateFn);
+  }
+
+  /**
+   * Update all properties that match a filter condition
+   * @param findCondition Function to determine which properties to update (returns true for target properties)
+   * @param updateFn Function that receives the existing property and returns the updated one
+   * @returns Array of updated property builders
+   */
+  updatePropertiesByFilter(
+    findCondition: (property: ts.PropertyDeclaration) => boolean,
+    updateFn: (property: ReturnType<typeof prop>) => ReturnType<typeof prop>,
+  ): Array<ReturnType<typeof prop>> {
+    const updatedProperties: Array<ReturnType<typeof prop>> = [];
+    const foundProperties = this.#decl.members.filter((member) => {
+      return ts.isPropertyDeclaration(member) && findCondition(member);
+    }) as ts.PropertyDeclaration[];
+
+    if (foundProperties.length === 0) {
+      return updatedProperties;
+    }
+
+    // Update each found property
+    for (const foundProperty of foundProperties) {
+      const propertyBuilder = prop(
+        ts.isIdentifier(foundProperty.name)
+          ? foundProperty.name.text
+          : foundProperty.name!.getText(),
+        foundProperty.type,
+        !!foundProperty.questionToken,
+      );
+
+      // Apply existing modifiers
+      if (foundProperty.modifiers) {
+        foundProperty.modifiers.forEach((mod) => {
+          if (ts.isModifier(mod)) {
+            propertyBuilder.$mod(mod);
+          }
+        });
+      }
+
+      // Apply existing initializer
+      if (foundProperty.initializer) {
+        propertyBuilder.$init(foundProperty.initializer);
+      }
+
+      const updatedProperty = updateFn(propertyBuilder);
+      updatedProperties.push(updatedProperty);
+
+      // Update the class with the new property
+      const updatedMembers = this.#decl.members.map((member) => {
+        if (member === foundProperty) {
+          return updatedProperty.get();
+        }
+        return member;
+      });
+
+      this.#decl = ts.factory.updateClassDeclaration(
+        this.#decl,
+        this.#decl.modifiers,
+        this.#decl.name,
+        this.#decl.typeParameters,
+        this.#decl.heritageClauses,
+        updatedMembers,
+      );
+    }
+
+    return updatedProperties;
+  }
+
+  // ========== Method Update Methods ==========
+
+  /**
+   * Update a method on the class using a callback function with a flexible find condition
+   * @param findCondition Function to determine which method to update (returns true for the target method)
+   * @param updateFn Function that receives the existing method and returns the updated one
+   * @returns The updated method builder or undefined if not found
+   */
+  updateMethod(
+    findCondition: (method: ts.MethodDeclaration) => boolean,
+    updateFn: (
+      method: ReturnType<typeof methodBuilder>,
+    ) => ReturnType<typeof methodBuilder>,
+  ): ReturnType<typeof methodBuilder> | undefined {
+    // Find the method using the condition
+    const methodMember = this.#decl.members.find((member) => {
+      return ts.isMethodDeclaration(member) && findCondition(member);
+    }) as ts.MethodDeclaration | undefined;
+
+    if (!methodMember) {
+      return undefined;
+    }
+
+    // Create a method builder from the existing method
+    const methodBuilderInstance = methodBuilder(
+      ts.isIdentifier(methodMember.name)
+        ? methodMember.name.text
+        : methodMember.name!.getText(),
+      Array.from(methodMember.parameters),
+      methodMember.body!,
+      methodMember.modifiers ? Array.from(methodMember.modifiers) : undefined,
+    );
+
+    // Apply the update function
+    const updatedMethod = updateFn(methodBuilderInstance);
+
+    // Update the class with the new method
+    const updatedMembers = this.#decl.members.map((member) => {
+      if (member === methodMember) {
+        return updatedMethod.get();
+      }
+      return member;
+    });
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      updatedMembers,
+    );
+
+    return updatedMethod;
+  }
+
+  /**
+   * Convenience method: Update method by name
+   * @param methodName The name of the method to update
+   * @param updateFn Function that receives the existing method and returns the updated one
+   * @returns The updated method builder or undefined if not found
+   */
+  updateMethodByName(
+    methodName: string,
+    updateFn: (
+      method: ReturnType<typeof methodBuilder>,
+    ) => ReturnType<typeof methodBuilder>,
+  ): ReturnType<typeof methodBuilder> | undefined {
+    return this.updateMethod((method) => {
+      if (ts.isIdentifier(method.name)) {
+        return method.name.text === methodName;
+      }
+      return method.name?.getText() === methodName;
+    }, updateFn);
+  }
+
+  /**
+   * Update all methods that match a filter condition
+   * @param findCondition Function to determine which methods to update (returns true for target methods)
+   * @param updateFn Function that receives the existing method and returns the updated one
+   * @returns Array of updated method builders
+   */
+  updateMethodsByFilter(
+    findCondition: (method: ts.MethodDeclaration) => boolean,
+    updateFn: (
+      method: ReturnType<typeof methodBuilder>,
+    ) => ReturnType<typeof methodBuilder>,
+  ): Array<ReturnType<typeof methodBuilder>> {
+    const updatedMethods: Array<ReturnType<typeof methodBuilder>> = [];
+    const foundMethods = this.#decl.members.filter((member) => {
+      return ts.isMethodDeclaration(member) && findCondition(member);
+    }) as ts.MethodDeclaration[];
+
+    if (foundMethods.length === 0) {
+      return updatedMethods;
+    }
+
+    // Update each found method
+    for (const foundMethod of foundMethods) {
+      const methodBuilderInstance = methodBuilder(
+        ts.isIdentifier(foundMethod.name)
+          ? foundMethod.name.text
+          : foundMethod.name!.getText(),
+        Array.from(foundMethod.parameters),
+        foundMethod.body!,
+        foundMethod.modifiers ? Array.from(foundMethod.modifiers) : undefined,
+      );
+
+      const updatedMethod = updateFn(methodBuilderInstance);
+      updatedMethods.push(updatedMethod);
+
+      // Update the class with the new method
+      const updatedMembers = this.#decl.members.map((member) => {
+        if (member === foundMethod) {
+          return updatedMethod.get();
+        }
+        return member;
+      });
+
+      this.#decl = ts.factory.updateClassDeclaration(
+        this.#decl,
+        this.#decl.modifiers,
+        this.#decl.name,
+        this.#decl.typeParameters,
+        this.#decl.heritageClauses,
+        updatedMembers,
+      );
+    }
+
+    return updatedMethods;
+  }
+
+  // ========== Constructor Update Methods ==========
+
+  /**
+   * Update the constructor on the class using a callback function
+   * @param updateFn Function that receives the existing constructor and returns the updated one
+   * @returns The updated constructor builder or undefined if not found
+   */
+  updateConstructor(
+    updateFn: (
+      constructor: ReturnType<typeof ctorBuilder>,
+    ) => ReturnType<typeof ctorBuilder>,
+  ): ReturnType<typeof ctorBuilder> | undefined {
+    // Find the constructor
+    const constructorMember = this.#decl.members.find((member) => {
+      return ts.isConstructorDeclaration(member);
+    }) as ts.ConstructorDeclaration | undefined;
+
+    if (!constructorMember) {
+      return undefined;
+    }
+
+    // Create a constructor builder from the existing constructor
+    const constructorBuilderInstance = ctorBuilder(
+      Array.from(constructorMember.parameters),
+      constructorMember.body!,
+    );
+
+    // Apply existing modifiers
+    if (constructorMember.modifiers) {
+      constructorMember.modifiers.forEach((mod) => {
+        if (ts.isModifier(mod)) {
+          constructorBuilderInstance.$mod(mod);
+        }
+      });
+    }
+
+    // Apply the update function
+    const updatedConstructor = updateFn(constructorBuilderInstance);
+
+    // Update the class with the new constructor
+    const updatedMembers = this.#decl.members.map((member) => {
+      if (member === constructorMember) {
+        return updatedConstructor.get();
+      }
+      return member;
+    });
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.heritageClauses,
+      updatedMembers,
+    );
+
+    return updatedConstructor;
   }
 
   get(): ts.ClassDeclaration {
