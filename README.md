@@ -56,7 +56,7 @@ await writeAll({ outputDir: "./generated" });
 
 📖 **[Complete API Reference](API.md)** - Comprehensive documentation with chainable and declarative examples for all APIs.
 
-## Why Choose ts-flattered?
+## Comparision to other AST Libraries
 
 | Aspect | ts-flattered | ts-morph | ts.factory |
 |--------|-------------|----------|------------|
