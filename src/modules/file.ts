@@ -148,6 +148,336 @@ class FileBuilder implements BuildableAST {
     return this;
   }
 
+  /**
+   * Updates existing classes in the source file using a callback function
+   * The callback receives a klass builder for each class and should return the modified class
+   */
+  updateClasses(updateFn: (classBuilder: ReturnType<typeof klass>) => ReturnType<typeof klass>) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isClassDeclaration(statement)) {
+        // Create a klass builder for the existing class
+        const classBuilder = klass(statement);
+        // Apply the update function
+        const updatedBuilder = updateFn(classBuilder);
+        // Return the updated class declaration
+        return updatedBuilder.get();
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific class by name in the source file
+   */
+  updateClass(className: string, updateFn: (classBuilder: ReturnType<typeof klass>) => ReturnType<typeof klass>) {
+    return this.updateClasses((classBuilder) => {
+      const classDecl = classBuilder.get();
+      if (classDecl.name?.text === className) {
+        return updateFn(classBuilder);
+      }
+      return classBuilder;
+    });
+  }
+
+  /**
+   * Updates existing functions in the source file using a callback function
+   */
+  updateFunctions(updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isFunctionDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific function by name in the source file
+   */
+  updateFunction(functionName: string, updateFn: (statement: ts.FunctionDeclaration) => ts.FunctionDeclaration) {
+    return this.updateFunctions((statement) => {
+      if (statement.name?.text === functionName) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Updates existing variable statements in the source file using a callback function
+   */
+  updateVariableStatements(updateFn: (statement: ts.VariableStatement) => ts.VariableStatement) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isVariableStatement(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific variable by name in the source file
+   */
+  updateVariable(variableName: string, updateFn: (statement: ts.VariableStatement) => ts.VariableStatement) {
+    return this.updateVariableStatements((statement) => {
+      // Check if this variable statement contains the variable we're looking for
+      const hasVariable = statement.declarationList.declarations.some((decl) => 
+        ts.isIdentifier(decl.name) && decl.name.text === variableName
+      );
+      
+      if (hasVariable) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Updates existing interface declarations in the source file using a callback function
+   */
+  updateInterfaces(updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isInterfaceDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific interface by name in the source file
+   */
+  updateInterface(interfaceName: string, updateFn: (statement: ts.InterfaceDeclaration) => ts.InterfaceDeclaration) {
+    return this.updateInterfaces((statement) => {
+      if (statement.name.text === interfaceName) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Updates existing type alias declarations in the source file using a callback function
+   */
+  updateTypeAliases(updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isTypeAliasDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific type alias by name in the source file
+   */
+  updateTypeAlias(typeName: string, updateFn: (statement: ts.TypeAliasDeclaration) => ts.TypeAliasDeclaration) {
+    return this.updateTypeAliases((statement) => {
+      if (statement.name.text === typeName) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Updates existing enum declarations in the source file using a callback function
+   */
+  updateEnums(updateFn: (statement: ts.EnumDeclaration) => ts.EnumDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isEnumDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates a specific enum by name in the source file
+   */
+  updateEnum(enumName: string, updateFn: (statement: ts.EnumDeclaration) => ts.EnumDeclaration) {
+    return this.updateEnums((statement) => {
+      if (statement.name.text === enumName) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Updates existing import declarations in the source file using a callback function
+   */
+  updateImports(updateFn: (statement: ts.ImportDeclaration) => ts.ImportDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isImportDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Updates existing export declarations in the source file using a callback function
+   */
+  updateExports(updateFn: (statement: ts.ExportDeclaration) => ts.ExportDeclaration) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (ts.isExportDeclaration(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Generic method to update any statement type using a filter and update function
+   */
+  updateStatements<T extends ts.Statement>(
+    filter: (statement: ts.Statement) => statement is T,
+    updateFn: (statement: T) => T
+  ) {
+    const updatedStatements = this.#statements.map((statement) => {
+      if (filter(statement)) {
+        return updateFn(statement);
+      }
+      return statement;
+    });
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
   getStatements(): readonly ts.Statement[] {
     return this.#statements;
   }

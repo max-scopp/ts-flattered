@@ -7,6 +7,7 @@ export * from "./core/func";
 export * from "./core/klass";
 export * from "./core/method";
 export * from "./core/modifier";
+export * from "./core/object";
 export * from "./core/params";
 export * from "./core/prop";
 export * from "./core/stmt";
@@ -24,3 +25,4 @@ export * from "./modules/program";
 export * from "./modules/registry";
 export * from "./modules/symbolResolver";
 export * from "./types";
+
