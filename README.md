@@ -54,6 +54,8 @@ await writeAll({ outputDir: "./generated" });
 - **`assign(target, value)`** - Create an assignment expression
 - **`writeAll(opts)`** - Generate all files to disk
 
+📖 **[Complete API Reference](API.md)** - Comprehensive documentation with chainable and declarative examples for all APIs.
+
 ## Why Choose ts-flattered?
 
 | Aspect | ts-flattered | ts-morph | ts.factory |
