@@ -1,4 +1,6 @@
 import ts from "typescript";
+import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $export } from "./modifier";
 
@@ -82,6 +84,38 @@ class VariableDeclarationBuilder implements BuildableAST {
       this.#stmt.modifiers,
       newList,
     );
+    return this;
+  }
+
+  // ========== Comment Methods ==========
+
+  /**
+   * Add leading comment(s) to the variable statement
+   * @param comment Comment content to add
+   * @returns The variable builder for chaining
+   */
+  addLeadingComment(comment: CommentContent): this {
+    this.#stmt = addComments(this.#stmt, { leading: [comment] });
+    return this;
+  }
+
+  /**
+   * Add trailing comment(s) to the variable statement
+   * @param comment Comment content to add
+   * @returns The variable builder for chaining
+   */
+  addTrailingComment(comment: CommentContent): this {
+    this.#stmt = addComments(this.#stmt, { trailing: [comment] });
+    return this;
+  }
+
+  /**
+   * Add multiple comments to the variable statement
+   * @param options Trivia options with leading and/or trailing comments
+   * @returns The variable builder for chaining
+   */
+  addComments(options: TriviaOptions): this {
+    this.#stmt = addComments(this.#stmt, options);
     return this;
   }
 

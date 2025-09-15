@@ -1,5 +1,7 @@
 import ts from "typescript";
 import { type DecoratorFilterOptions, findDecorators } from "../helpers/finder";
+import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { fromDecorator } from "./decorator";
 import {
@@ -313,6 +315,38 @@ class PropBuilder implements BuildableAST {
       }
       return name === decoratorName;
     }, updateFn);
+  }
+
+  // ========== Comment Methods ==========
+
+  /**
+   * Add leading comment(s) to the property declaration
+   * @param comment Comment content to add
+   * @returns The property builder for chaining
+   */
+  addLeadingComment(comment: CommentContent): this {
+    this.#decl = addComments(this.#decl, { leading: [comment] });
+    return this;
+  }
+
+  /**
+   * Add trailing comment(s) to the property declaration
+   * @param comment Comment content to add
+   * @returns The property builder for chaining
+   */
+  addTrailingComment(comment: CommentContent): this {
+    this.#decl = addComments(this.#decl, { trailing: [comment] });
+    return this;
+  }
+
+  /**
+   * Add multiple comments to the property declaration
+   * @param options Trivia options with leading and/or trailing comments
+   * @returns The property builder for chaining
+   */
+  addComments(options: TriviaOptions): this {
+    this.#decl = addComments(this.#decl, options);
+    return this;
   }
 
   get(): ts.PropertyDeclaration {
