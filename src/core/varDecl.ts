@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import type { CommentContent, TriviaOptions } from "../helpers/trivia";
 import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 
@@ -21,12 +21,12 @@ class VarDeclBuilder implements BuildableAST {
       type,
       undefined, // initializer
     );
-    
+
     const declarationList = ts.factory.createVariableDeclarationList(
       [declaration],
       ts.NodeFlags.None, // var declaration
     );
-    
+
     this.#decl = ts.factory.createVariableStatement(mods, declarationList);
   }
 

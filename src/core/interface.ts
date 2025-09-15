@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import type { CommentContent, TriviaOptions } from "../helpers/trivia";
 import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $export } from "./modifier";
@@ -56,16 +56,16 @@ class InterfaceBuilder implements BuildableAST {
 
   // Add extends clause
   extends(...types: (string | ts.TypeReferenceNode)[]) {
-    const heritageTypes = types.map(type => 
-      typeof type === "string" 
+    const heritageTypes = types.map((type) =>
+      typeof type === "string"
         ? ts.factory.createExpressionWithTypeArguments(
-            ts.factory.createIdentifier(type), 
-            undefined
+            ts.factory.createIdentifier(type),
+            undefined,
           )
         : ts.factory.createExpressionWithTypeArguments(
-            type.typeName as ts.Expression, 
-            type.typeArguments
-          )
+            type.typeName as ts.Expression,
+            type.typeArguments,
+          ),
     );
 
     const extendsClause = ts.factory.createHeritageClause(
@@ -91,9 +91,13 @@ class InterfaceBuilder implements BuildableAST {
     optional = false,
     readonly = false,
   ) {
-    const modifiers = readonly ? [ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword)] : undefined;
-    const questionToken = optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined;
-    
+    const modifiers = readonly
+      ? [ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword)]
+      : undefined;
+    const questionToken = optional
+      ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+      : undefined;
+
     const property = ts.factory.createPropertySignature(
       modifiers,
       ts.factory.createIdentifier(name),
@@ -119,8 +123,10 @@ class InterfaceBuilder implements BuildableAST {
     returnType?: ts.TypeNode,
     optional = false,
   ) {
-    const questionToken = optional ? ts.factory.createToken(ts.SyntaxKind.QuestionToken) : undefined;
-    
+    const questionToken = optional
+      ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+      : undefined;
+
     const method = ts.factory.createMethodSignature(
       undefined, // modifiers
       ts.factory.createIdentifier(name),
@@ -192,8 +198,10 @@ class InterfaceBuilder implements BuildableAST {
     valueType: ts.TypeNode,
     readonly = false,
   ) {
-    const modifiers = readonly ? [ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword)] : undefined;
-    
+    const modifiers = readonly
+      ? [ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword)]
+      : undefined;
+
     const parameter = ts.factory.createParameterDeclaration(
       undefined, // modifiers
       undefined, // dotDotDotToken

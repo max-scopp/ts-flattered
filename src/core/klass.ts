@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { type DecoratorFilterOptions, findDecorators } from "../helpers/finder";
-import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import type { CommentContent, TriviaOptions } from "../helpers/trivia";
 import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { ctor as ctorBuilder } from "./ctor";

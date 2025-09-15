@@ -1,22 +1,19 @@
-import type {
-  CommentContent,
-  JSDocTag,
-} from "./trivia";
+import type { CommentContent, JSDocTag } from "./trivia";
 import {
+  authorTag,
+  blockComment,
   CommentStyle,
   createClassJSDoc,
   createMethodJSDoc,
   createPropertyJSDoc,
+  deprecatedTag,
+  exampleTag,
   jsdocComment,
   lineComment,
-  blockComment,
   paramTag,
   returnsTag,
-  exampleTag,
-  deprecatedTag,
-  sinceTag,
-  authorTag,
   seeTag,
+  sinceTag,
   throwsTag,
 } from "./trivia";
 

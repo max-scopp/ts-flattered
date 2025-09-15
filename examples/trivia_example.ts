@@ -4,48 +4,47 @@
  */
 
 import ts from "typescript";
+// Import comment presets
 import {
-  klass,
-  method,
-  prop,
-  func,
-  const_,
-  param,
-  block,
-  ret,
-  $string,
-  $number,
-  $,
-} from "../src/public_api";
+  constructorJSDoc,
+  fileHeaderComment,
+  fixmeComment,
+  functionJSDoc,
+  getterJSDoc,
+  setterJSDoc,
+  todoComment,
+  variableJSDoc,
+} from "../src/helpers/commentPresets";
 
 // Import trivia functionality
 import {
-  jsdocComment,
-  lineComment,
+  authorTag,
   blockComment,
+  CommentStyle,
   createClassJSDoc,
   createMethodJSDoc,
   createPropertyJSDoc,
+  deprecatedTag,
+  exampleTag,
+  jsdocComment,
+  lineComment,
   paramTag,
   returnsTag,
-  exampleTag,
-  deprecatedTag,
   sinceTag,
-  authorTag,
-  CommentStyle,
 } from "../src/helpers/trivia";
-
-// Import comment presets
 import {
-  todoComment,
-  fixmeComment,
-  constructorJSDoc,
-  getterJSDoc,
-  setterJSDoc,
-  functionJSDoc,
-  variableJSDoc,
-  fileHeaderComment,
-} from "../src/helpers/commentPresets";
+  $,
+  $number,
+  $string,
+  block,
+  const_,
+  func,
+  klass,
+  method,
+  param,
+  prop,
+  ret,
+} from "../src/public_api";
 
 // Helper function to print the generated code
 function printCode(node: ts.Node): string {
@@ -75,17 +74,14 @@ const userClass = klass("User", [
 ])
   .$export()
   .addLeadingComment(
-    createClassJSDoc(
-      "Represents a user in the system",
-      {
-        examples: [
-          "const user = new User('John', 25);",
-          "console.log(user.getName());",
-        ],
-        since: "1.0.0",
-        author: "Development Team",
-      },
-    ),
+    createClassJSDoc("Represents a user in the system", {
+      examples: [
+        "const user = new User('John', 25);",
+        "console.log(user.getName());",
+      ],
+      since: "1.0.0",
+      author: "Development Team",
+    }),
   );
 
 console.log(printCode(userClass.get()));
@@ -130,18 +126,18 @@ console.log("\n" + "=".repeat(50) + "\n");
 
 // Example 3: Property with JSDoc and inline comments
 console.log("3. Property with JSDoc and inline comments:");
-const configProperty = prop("config", ts.factory.createTypeReferenceNode("Config"))
+const configProperty = prop(
+  "config",
+  ts.factory.createTypeReferenceNode("Config"),
+)
   .$private()
   .$readonly()
   .addLeadingComment(
-    createPropertyJSDoc(
-      "Application configuration settings",
-      {
-        type: "Config",
-        since: "1.1.0",
-        see: ["ConfigLoader", "DefaultConfig"],
-      },
-    ),
+    createPropertyJSDoc("Application configuration settings", {
+      type: "Config",
+      since: "1.1.0",
+      see: ["ConfigLoader", "DefaultConfig"],
+    }),
   )
   .addTrailingComment(lineComment("Initialized in constructor"));
 
@@ -185,14 +181,10 @@ const apiUrlConstant = const_("API_URL", $("https://api.example.com"))
   .$export()
   .addLeadingComment(blockComment("Base URL for all API endpoints"))
   .addLeadingComment(
-    variableJSDoc(
-      "The base URL used for all API requests",
-      "string",
-      {
-        constant: true,
-        since: "1.0.0",
-      },
-    ),
+    variableJSDoc("The base URL used for all API requests", "string", {
+      constant: true,
+      since: "1.0.0",
+    }),
   );
 
 console.log(printCode(apiUrlConstant.get()));
@@ -206,50 +198,37 @@ const apiClientClass = klass("ApiClient", [
 ])
   .$export()
   .addLeadingComment(
-    createClassJSDoc(
-      "HTTP API client for making requests",
-      {
-        examples: [
-          "const client = new ApiClient('https://api.example.com');",
-          "const response = await client.get('/users');",
-        ],
-        since: "2.0.0",
-        author: "API Team",
-      },
-    ),
+    createClassJSDoc("HTTP API client for making requests", {
+      examples: [
+        "const client = new ApiClient('https://api.example.com');",
+        "const response = await client.get('/users');",
+      ],
+      since: "2.0.0",
+      author: "API Team",
+    }),
   )
   .addMember(
     method(
       "constructor",
-      [
-        param("baseUrl", $string()),
-        param("timeout", $number(), true),
-      ],
+      [param("baseUrl", $string()), param("timeout", $number(), true)],
       block([]),
     ).addLeadingComment(
-      constructorJSDoc(
-        "Creates a new API client instance",
-        [
-          {
-            name: "baseUrl",
-            type: "string",
-            description: "The base URL for API requests",
-          },
-          {
-            name: "timeout",
-            type: "number",
-            description: "Request timeout in milliseconds (default: 5000)",
-          },
-        ],
-      ),
+      constructorJSDoc("Creates a new API client instance", [
+        {
+          name: "baseUrl",
+          type: "string",
+          description: "The base URL for API requests",
+        },
+        {
+          name: "timeout",
+          type: "number",
+          description: "Request timeout in milliseconds (default: 5000)",
+        },
+      ]),
     ),
   )
   .addMember(
-    method(
-      "getBaseUrl",
-      [],
-      block([ret($("this.baseUrl"))]),
-    ).addLeadingComment(
+    method("getBaseUrl", [], block([ret($("this.baseUrl"))])).addLeadingComment(
       getterJSDoc("baseUrl", "string", "Gets the configured base URL"),
     ),
   )
@@ -268,22 +247,15 @@ console.log("\n" + "=".repeat(50) + "\n");
 
 // Example 7: Multiple comment types on a single node
 console.log("7. Multiple comment types on a single node:");
-const debugFunction = func(
-  "debug",
-  [param("message", $string())],
-  block([]),
-)
+const debugFunction = func("debug", [param("message", $string())], block([]))
   .addLeadingComment(blockComment("Debug utility function"))
   .addLeadingComment(
-    jsdocComment(
-      "Logs debug information to console",
-      [
-        paramTag("message", "The debug message to log", "string"),
-        deprecatedTag("Use console.debug() instead"),
-        sinceTag("0.1.0"),
-        authorTag("Debug Team"),
-      ],
-    ),
+    jsdocComment("Logs debug information to console", [
+      paramTag("message", "The debug message to log", "string"),
+      deprecatedTag("Use console.debug() instead"),
+      sinceTag("0.1.0"),
+      authorTag("Debug Team"),
+    ]),
   )
   .addTrailingComment(lineComment("Will be removed in v3.0"))
   .addTrailingComment(todoComment("Add log levels"));

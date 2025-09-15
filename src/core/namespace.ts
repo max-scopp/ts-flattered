@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import type { CommentContent, TriviaOptions } from "../helpers/trivia";
 import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 import { $export } from "./modifier";
@@ -52,7 +52,7 @@ class NamespaceBuilder implements BuildableAST {
   addStatement(statement: ts.Statement) {
     const currentBody = this.#decl.body as ts.ModuleBlock;
     const updatedStatements = [...currentBody.statements, statement];
-    
+
     this.#decl = ts.factory.updateModuleDeclaration(
       this.#decl,
       this.#decl.modifiers,
@@ -66,7 +66,7 @@ class NamespaceBuilder implements BuildableAST {
   addStatements(statements: ts.Statement[]) {
     const currentBody = this.#decl.body as ts.ModuleBlock;
     const updatedStatements = [...currentBody.statements, ...statements];
-    
+
     this.#decl = ts.factory.updateModuleDeclaration(
       this.#decl,
       this.#decl.modifiers,
@@ -123,7 +123,13 @@ export const namespace = (
   name: string,
   statements: ts.Statement[] = [],
   mods?: ts.ModifierLike[],
-) => buildFluentApi(NamespaceBuilder, { name, statements, mods, isNamespace: true });
+) =>
+  buildFluentApi(NamespaceBuilder, {
+    name,
+    statements,
+    mods,
+    isNamespace: true,
+  });
 
 /**
  * Create a module declaration (for ambient modules like declare module "...")
@@ -135,4 +141,10 @@ export const module = (
   name: string,
   statements: ts.Statement[] = [],
   mods?: ts.ModifierLike[],
-) => buildFluentApi(NamespaceBuilder, { name, statements, mods, isNamespace: false });
+) =>
+  buildFluentApi(NamespaceBuilder, {
+    name,
+    statements,
+    mods,
+    isNamespace: false,
+  });

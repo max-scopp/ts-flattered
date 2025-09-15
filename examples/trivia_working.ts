@@ -2,25 +2,43 @@
  * Working trivia handler example - demonstrates creating comments without printing
  */
 
-import { klass, func, prop, const_, param, block, $string, $number } from "../src/public_api";
-import { 
-  jsdocComment, 
-  lineComment, 
-  blockComment, 
-  paramTag, 
-  returnsTag,
+import { constructorJSDoc, todoComment } from "../src/helpers/commentPresets";
+import {
+  blockComment,
+  CommentStyle,
   commentToString,
-  CommentStyle 
+  jsdocComment,
+  lineComment,
+  paramTag,
+  returnsTag,
 } from "../src/helpers/trivia";
-import { todoComment, constructorJSDoc } from "../src/helpers/commentPresets";
+import {
+  $number,
+  $string,
+  block,
+  const_,
+  func,
+  klass,
+  param,
+  prop,
+} from "../src/public_api";
 
 console.log("=== Trivia Handler Demonstration ===\n");
 
 // Example 1: Different comment styles
 console.log("1. Comment Styles:");
-console.log("Line comment:", commentToString(lineComment("This is a line comment")));
-console.log("Block comment:", commentToString(blockComment("This is a block comment")));
-console.log("JSDoc comment:", commentToString(jsdocComment("This is a JSDoc comment")));
+console.log(
+  "Line comment:",
+  commentToString(lineComment("This is a line comment")),
+);
+console.log(
+  "Block comment:",
+  commentToString(blockComment("This is a block comment")),
+);
+console.log(
+  "JSDoc comment:",
+  commentToString(jsdocComment("This is a JSDoc comment")),
+);
 console.log();
 
 // Example 2: JSDoc with tags
@@ -30,7 +48,7 @@ const methodDoc = jsdocComment("Calculates the sum of two numbers", [
   paramTag("b", "Second number", "number"),
   returnsTag("The sum of a and b", "number"),
   { name: "example", text: "add(1, 2) // returns 3" },
-  { name: "since", text: "1.0.0" }
+  { name: "since", text: "1.0.0" },
 ]);
 console.log(commentToString(methodDoc));
 console.log();
@@ -38,12 +56,15 @@ console.log();
 // Example 3: Comment presets
 console.log("3. Comment Presets:");
 console.log("TODO:", commentToString(todoComment("Implement validation")));
-console.log("Constructor JSDoc:", commentToString(
-  constructorJSDoc("Creates a new instance", [
-    { name: "name", type: "string", description: "The user's name" },
-    { name: "age", type: "number", description: "The user's age" }
-  ])
-));
+console.log(
+  "Constructor JSDoc:",
+  commentToString(
+    constructorJSDoc("Creates a new instance", [
+      { name: "name", type: "string", description: "The user's name" },
+      { name: "age", type: "number", description: "The user's age" },
+    ]),
+  ),
+);
 console.log();
 
 // Example 4: Building AST nodes with comments (without printing)
@@ -55,13 +76,13 @@ const userClass = klass("User")
   .addLeadingComment(
     jsdocComment("Represents a user in the system", [
       { name: "example", text: "const user = new User('John', 25);" },
-      { name: "since", text: "1.0.0" }
-    ])
+      { name: "since", text: "1.0.0" },
+    ]),
   )
   .addMember(
     prop("name", $string())
       .$private()
-      .addLeadingComment(jsdocComment("The user's name"))
+      .addLeadingComment(jsdocComment("The user's name")),
   );
 
 console.log("Class created with JSDoc comment");
@@ -75,8 +96,8 @@ const greetFunction = func("greet", [param("message", $string())], block([]))
   .addLeadingComment(
     jsdocComment("Greets the user", [
       paramTag("message", "The greeting message", "string"),
-      returnsTag("The greeting response", "string")
-    ])
+      returnsTag("The greeting response", "string"),
+    ]),
   )
   .addTrailingComment(todoComment("Add input validation"));
 
@@ -97,9 +118,17 @@ console.log("The trivia handler allows you to:");
 console.log("- Add JSDoc comments with full tag support");
 console.log("- Add single-line and multi-line comments");
 console.log("- Use preset comment functions for common patterns");
-console.log("- Attach comments to any AST node (classes, methods, properties, variables, etc.)");
+console.log(
+  "- Attach comments to any AST node (classes, methods, properties, variables, etc.)",
+);
 console.log("- Chain multiple comments on the same node");
 console.log();
-console.log("Note: Due to TypeScript printer limitations with synthetic comments,");
-console.log("comments may not always render correctly when printing to strings.");
-console.log("However, the AST nodes contain the comment information correctly.");
+console.log(
+  "Note: Due to TypeScript printer limitations with synthetic comments,",
+);
+console.log(
+  "comments may not always render correctly when printing to strings.",
+);
+console.log(
+  "However, the AST nodes contain the comment information correctly.",
+);

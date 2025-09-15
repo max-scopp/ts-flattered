@@ -1,5 +1,5 @@
 import ts from "typescript";
-import type { TriviaOptions, CommentContent } from "../helpers/trivia";
+import type { CommentContent, TriviaOptions } from "../helpers/trivia";
 import { addComments } from "../helpers/trivia";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 
@@ -24,7 +24,7 @@ class GlobalBuilder implements BuildableAST {
   addStatement(statement: ts.Statement) {
     const currentBody = this.#decl.body as ts.ModuleBlock;
     const updatedStatements = [...currentBody.statements, statement];
-    
+
     this.#decl = ts.factory.updateModuleDeclaration(
       this.#decl,
       this.#decl.modifiers,
@@ -38,7 +38,7 @@ class GlobalBuilder implements BuildableAST {
   addStatements(statements: ts.Statement[]) {
     const currentBody = this.#decl.body as ts.ModuleBlock;
     const updatedStatements = [...currentBody.statements, ...statements];
-    
+
     this.#decl = ts.factory.updateModuleDeclaration(
       this.#decl,
       this.#decl.modifiers,
@@ -89,5 +89,5 @@ class GlobalBuilder implements BuildableAST {
  * Create a global declaration (declare global { ... })
  * @param statements Optional statements to include in the global block
  */
-export const global = (statements: ts.Statement[] = []) => 
+export const global = (statements: ts.Statement[] = []) =>
   buildFluentApi(GlobalBuilder, { statements });

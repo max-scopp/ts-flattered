@@ -119,7 +119,7 @@ export function commentToString(comment: CommentContent): string {
 
     case CommentStyle.JSDoc: {
       const lines = [`*`];
-      
+
       // Add main text
       if (comment.text.trim()) {
         comment.text.split("\n").forEach((line) => {
@@ -132,7 +132,7 @@ export function commentToString(comment: CommentContent): string {
         if (comment.text.trim()) {
           lines.push(" *");
         }
-        
+
         comment.tags.forEach((tag) => {
           if (tag.name === "param" && tag.parameterName) {
             const typeInfo = tag.parameterType ? `{${tag.parameterType}} ` : "";
@@ -162,7 +162,7 @@ export function addLeadingComment<T extends ts.Node>(
   comment: CommentContent,
 ): T {
   const commentText = commentToString(comment);
-  
+
   // Determine comment kind based on style
   let kind: ts.SyntaxKind;
   switch (comment.style) {
@@ -194,7 +194,7 @@ export function addTrailingComment<T extends ts.Node>(
   comment: CommentContent,
 ): T {
   const commentText = commentToString(comment);
-  
+
   // Determine comment kind based on style
   let kind: ts.SyntaxKind;
   switch (comment.style) {
