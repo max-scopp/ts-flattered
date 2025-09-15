@@ -81,6 +81,14 @@ ts-flattered offers excellent performance with minimal overhead:
 - **1.8x slower than raw `ts.factory`** (chainable style)
 - **40-45x faster than `ts-morph`**
 
+## AI Code Generation
+
+This library represents a practical solution to the gap between `ts.morph` and `ts.factory`. The initial investigation, research, testing, and core concept creation was done by a human developer. However, all subsequent code has been generated using AI assistants guided by instruction files based on the original human work.
+
+This approach allows the creation of comprehensive results without interrupting more important work on other libraries. **This project purely exists to move on to bigger problems** - it serves as a foundation tool that enables focus on higher-level challenges rather than getting bogged down in AST manipulation details.
+
+The combination of human architectural vision and AI implementation demonstrates how modern development can leverage both human creativity and AI efficiency to solve practical problems at scale.
+
 ## License
 
 MIT
