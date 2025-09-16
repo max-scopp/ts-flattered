@@ -1,6 +1,24 @@
 # ts-flattered API Reference
 
-## 📖 Quick Index
+## � Trivia Preservation
+
+**All APIs support trivia preservation automatically!** TypeScript AST nodes created with `setParentNodes: true` (which ts-flattered always uses) preserve comments, decorators, and JSDoc automatically.
+
+**Two Patterns for Each Builder:**
+
+1. **Create New** - Build from scratch using string parameters
+2. **Adopt Existing** - Pass existing AST nodes to preserve all trivia (comments, decorators, JSDoc)
+
+```typescript
+// Create new (no existing trivia)
+const newProp = prop("name", $string());
+
+// Adopt existing (preserves ALL trivia)
+const updatedProp = prop(existingPropertyNode)
+  .$readonly(); // Comments and decorators preserved!
+```
+
+## �📖 Quick Index
 
 **🏗️ Core Builders**
 - [Classes](#classes) • [Functions](#functions) • [Methods](#methods) • [Properties](#properties) • [Variables](#variables) • [Parameters](#parameters)
@@ -30,7 +48,15 @@
 ### `klass()`
 Create class declarations with fluent chaining.
 
-**Chainable:**
+**Signatures:**
+```typescript
+// Create new class
+klass(name: string, members?: ts.ClassElement[], mods?: ts.ModifierLike[])
+// Adopt existing class (preserves trivia)
+klass(existingClass: ts.ClassDeclaration)
+```
+
+**Chainable (Create New):**
 ```typescript
 klass("User")
   .$export()
@@ -39,12 +65,20 @@ klass("User")
   .addMethod(method("getName", [], block([])).get())
 ```
 
-**Declarative:**
+**Declarative (Create New):**
 ```typescript
 const userClass = klass("User", [
   prop("name", $string()).get(),
   method("getName", [], block([])).get()
 ], [$export(), $abstract()]);
+```
+
+**Adopt Existing (Preserves Comments/Decorators):**
+```typescript
+// Pass existing class declaration to preserve all trivia
+const updatedClass = klass(existingClassNode)
+  .$export()
+  .addProp(prop("newField", $string()).get());
 ```
 
 ---
@@ -54,7 +88,15 @@ const userClass = klass("User", [
 ### `func()`
 Create function declarations.
 
-**Chainable:**
+**Signatures:**
+```typescript
+// Create new function
+func(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[])
+// Adopt existing function (preserves trivia)
+func(existingFunction: ts.FunctionDeclaration)
+```
+
+**Chainable (Create New):**
 ```typescript
 func("calculate", [param("x", $number())])
   .$export()
@@ -62,12 +104,20 @@ func("calculate", [param("x", $number())])
   .body(block([ret($(42))]))
 ```
 
-**Declarative:**
+**Declarative (Create New):**
 ```typescript
 const calcFunc = func("calculate", 
   [param("x", $number()).get()], 
   block([ret($(42))])
 );
+```
+
+**Adopt Existing (Preserves Comments/Decorators):**
+```typescript
+// Pass existing function declaration to preserve all trivia
+const updatedFunc = func(existingFunctionNode)
+  .$export()
+  .$async();
 ```
 
 ### `arrow()`
@@ -92,7 +142,15 @@ const arrowFunc = arrow([param("x", $number()).get()], $(42));
 ### `method()`
 Create class method declarations.
 
-**Chainable:**
+**Signatures:**
+```typescript
+// Create new method
+method(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[])
+// Adopt existing method (preserves trivia)
+method(existingMethod: ts.MethodDeclaration)
+```
+
+**Chainable (Create New):**
 ```typescript
 method("process", [param("data", $any())], block([]))
   .$public()
@@ -100,13 +158,21 @@ method("process", [param("data", $any())], block([]))
   .$static()
 ```
 
-**Declarative:**
+**Declarative (Create New):**
 ```typescript
 const processMethod = method("process", 
   [param("data", $any()).get()], 
   block([]),
   [$public(), $async(), $static()]
 );
+```
+
+**Adopt Existing (Preserves Comments/Decorators):**
+```typescript
+// Pass existing method declaration to preserve all trivia
+const updatedMethod = method(existingMethodNode)
+  .$public()
+  .addDecorator(decorator("Override").get());
 ```
 
 ---
@@ -116,7 +182,15 @@ const processMethod = method("process",
 ### `prop()`
 Create class property declarations.
 
-**Chainable:**
+**Signatures:**
+```typescript
+// Create new property
+prop(name: string, type?: ts.TypeNode, optional?: boolean)
+// Adopt existing property (preserves trivia)
+prop(existingProperty: ts.PropertyDeclaration)
+```
+
+**Chainable (Create New):**
 ```typescript
 prop("name", $string(), true)
   .$private()
@@ -124,9 +198,17 @@ prop("name", $string(), true)
   .addDecorator(decorator("Required").get())
 ```
 
-**Declarative:**
+**Declarative (Create New):**
 ```typescript
 const nameProp = prop("name", $string(), true);
+```
+
+**Adopt Existing (Preserves Comments/Decorators):**
+```typescript
+// Pass existing property declaration to preserve all trivia
+const updatedProp = prop(existingPropertyNode)
+  .$readonly()
+  .addDecorator(decorator("Validate").get());
 ```
 
 ---

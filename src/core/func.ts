@@ -24,16 +24,33 @@ class FunctionBuilder implements BuildableAST {
     mods?: ts.ModifierLike[];
     typeParams?: ts.TypeParameterDeclaration[];
     returnType?: ts.TypeNode;
-  }) {
-    this.#decl = ts.factory.createFunctionDeclaration(
-      mods,
-      undefined, // asterisk token
-      name,
-      typeParams,
-      params ?? [],
-      returnType,
-      body,
-    );
+  });
+  constructor(from: ts.FunctionDeclaration);
+  constructor(
+    optionsOrFrom:
+      | {
+          name: string;
+          params?: ts.ParameterDeclaration[];
+          body?: ts.Block;
+          mods?: ts.ModifierLike[];
+          typeParams?: ts.TypeParameterDeclaration[];
+          returnType?: ts.TypeNode;
+        }
+      | ts.FunctionDeclaration
+  ) {
+    if ("name" in optionsOrFrom) {
+      this.#decl = ts.factory.createFunctionDeclaration(
+        optionsOrFrom.mods,
+        undefined,
+        optionsOrFrom.name,
+        optionsOrFrom.typeParams,
+        optionsOrFrom.params ?? [],
+        optionsOrFrom.returnType,
+        optionsOrFrom.body,
+      );
+    } else {
+      this.#decl = optionsOrFrom;
+    }
   }
 
   $export() {
@@ -376,11 +393,23 @@ class ArrowFunctionBuilder implements BuildableAST {
   }
 }
 
-export const func = (
+export function func(
   name: string,
+  params?: ts.ParameterDeclaration[],
+  body?: ts.Block
+): ReturnType<typeof buildFluentApi>;
+export function func(existingFunction: ts.FunctionDeclaration): ReturnType<typeof buildFluentApi>;
+export function func(
+  nameOrFunction: string | ts.FunctionDeclaration,
   params: ts.ParameterDeclaration[] = [],
   body?: ts.Block,
-) => buildFluentApi(FunctionBuilder, { name, params, body });
+) {
+  if (typeof nameOrFunction === "string") {
+    return buildFluentApi(FunctionBuilder, { name: nameOrFunction, params, body });
+  } else {
+    return buildFluentApi(FunctionBuilder, nameOrFunction);
+  }
+}
 
 export const arrow = (
   params: ts.ParameterDeclaration[] = [],

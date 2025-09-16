@@ -12,12 +12,22 @@ class CtorBuilder implements BuildableAST {
   }: {
     args: ts.ParameterDeclaration[];
     body: ts.Block;
-  }) {
-    this.#decl = ts.factory.createConstructorDeclaration(
-      undefined, // modifiers
-      args,
-      body,
-    );
+  });
+  constructor(from: ts.ConstructorDeclaration);
+  constructor(
+    optionsOrFrom:
+      | { args: ts.ParameterDeclaration[]; body: ts.Block }
+      | ts.ConstructorDeclaration
+  ) {
+    if ("args" in optionsOrFrom) {
+      this.#decl = ts.factory.createConstructorDeclaration(
+        undefined,
+        optionsOrFrom.args,
+        optionsOrFrom.body,
+      );
+    } else {
+      this.#decl = optionsOrFrom;
+    }
   }
 
   // Fluent modifier methods
@@ -110,5 +120,21 @@ class CtorBuilder implements BuildableAST {
   }
 }
 
-export const ctor = (args: ts.ParameterDeclaration[], body: ts.Block) =>
-  buildFluentApi(CtorBuilder, { args, body });
+export function ctor(
+  args: ts.ParameterDeclaration[],
+  body: ts.Block
+): ReturnType<typeof buildFluentApi>;
+export function ctor(existingConstructor: ts.ConstructorDeclaration): ReturnType<typeof buildFluentApi>;
+export function ctor(
+  argsOrConstructor: ts.ParameterDeclaration[] | ts.ConstructorDeclaration,
+  body?: ts.Block,
+) {
+  if (Array.isArray(argsOrConstructor)) {
+    if (!body) {
+      throw new Error("body is required when creating a new constructor");
+    }
+    return buildFluentApi(CtorBuilder, { args: argsOrConstructor, body });
+  } else {
+    return buildFluentApi(CtorBuilder, argsOrConstructor);
+  }
+}

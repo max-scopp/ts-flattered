@@ -169,7 +169,142 @@ const node: ts.ClassDeclaration = myNode.get(); // Returns updated AST node
 
 ---
 
-## **6. General Coding Guidelines**
+## **6. CRITICAL: Trivia Preservation Requirements**
+
+**⚠️ MUST VERIFY: All new APIs must consider trivia (comments, decorators, JSDoc) preservation to avoid losing important code metadata.**
+
+**Note: TypeScript automatically preserves trivia when `setParentNodes` is set to `true` in `ts.createSourceFile`, which is always done in this codebase.**
+
+### **Builder Constructor Patterns**
+
+All builder constructors **MUST** support both creation modes:
+
+1. **Create new node**: For building from scratch
+2. **Adopt existing node**: For preserving trivia when updating existing code
+
+**Required constructor pattern:**
+
+```ts
+constructor({
+  name,
+  type,
+  optional,
+}: {
+  name: string;
+  type?: ts.TypeNode;
+  optional?: boolean;
+});
+constructor(from: ts.PropertyDeclaration);
+constructor(
+  optionsOrFrom: 
+    | { name: string; type?: ts.TypeNode; optional?: boolean }
+    | ts.PropertyDeclaration
+) {
+  if ('name' in optionsOrFrom) {
+    // Create new node
+    this.#decl = ts.factory.createPropertyDeclaration(
+      undefined, // modifiers
+      optionsOrFrom.name,
+      optionsOrFrom.optional
+        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+        : undefined,
+      optionsOrFrom.type,
+      undefined, // initializer
+    );
+  } else {
+    // Adopt from existing node - preserves ALL trivia
+    this.#decl = optionsOrFrom;
+  }
+}
+```
+
+### **Public API Function Patterns**
+
+Public functions **MUST** support both creation and adoption through overloading:
+
+```ts
+export const prop = (
+  nameOrProperty: string | ts.PropertyDeclaration, 
+  type?: ts.TypeNode, 
+  optional?: boolean
+) => {
+  if (typeof nameOrProperty === 'string') {
+    return buildFluentApi(PropBuilder, { name: nameOrProperty, type, optional });
+  } else {
+    // Adopt existing node to preserve trivia
+    return buildFluentApi(PropBuilder, { from: nameOrProperty });
+  }
+};
+```
+
+**Alternative overloaded signatures (recommended):**
+```ts
+export function prop(name: string, type?: ts.TypeNode, optional?: boolean): ReturnType<typeof buildFluentApi>;
+export function prop(existingProperty: ts.PropertyDeclaration): ReturnType<typeof buildFluentApi>;
+export function prop(
+  nameOrProperty: string | ts.PropertyDeclaration, 
+  type?: ts.TypeNode, 
+  optional?: boolean
+) {
+  if (typeof nameOrProperty === 'string') {
+    return buildFluentApi(PropBuilder, { name: nameOrProperty, type, optional });
+  } else {
+    return buildFluentApi(PropBuilder, nameOrProperty);
+  }
+}
+```
+
+### **Update Method Requirements**
+
+When implementing `update*ByFilter` methods in parent builders (like `updatePropertiesByFilter`):
+
+**❌ WRONG - Loses trivia:**
+```ts
+const propertyBuilder = prop(
+  foundProperty.name.text,
+  foundProperty.type,
+  !!foundProperty.questionToken
+);
+```
+
+**✅ CORRECT - Preserves trivia:**
+```ts
+const propertyBuilder = prop(foundProperty); // Pass entire node
+```
+
+### **Testing Requirements**
+
+Every new builder **MUST** include tests that verify:
+
+1. ✅ JSDoc comments are preserved
+2. ✅ Decorators are preserved  
+3. ✅ Inline comments are preserved
+4. ✅ Leading/trailing trivia is preserved
+5. ✅ `print()` method output contains all original trivia
+
+**Test pattern:**
+```ts
+const original = `
+  /**
+   * JSDoc comment
+   */
+  @Decorator({ option: true })
+  property: string; // inline comment
+`;
+
+const builder = prop(existingPropertyNode);
+const updated = builder.someUpdate();
+const result = updated.get().getFullText();
+
+// MUST contain all original trivia
+assert(result.includes("JSDoc comment"));
+assert(result.includes("@Decorator"));
+assert(result.includes("inline comment"));
+```
+
+---
+
+## **7. General Coding Guidelines**
 
 1. Keep **API calls flat** — avoid standalone `param()` or `typeParam()`.
 2. Prefer **fluent chaining** over options objects for simple cases.
@@ -183,14 +318,15 @@ const node: ts.ClassDeclaration = myNode.get(); // Returns updated AST node
 
 ---
 
-## **7. Summary**
+## **8. Summary**
 
 * **Builder class** → maintains internal AST node (`#decl`) + fluent methods
-* **Constructor** → creates initial AST node via `ts.factory.create*`
+* **Constructor** → creates initial AST node via `ts.factory.create*` OR adopts existing node for trivia preservation
 * **Fluent methods** → update AST node directly using `ts.factory.update*` methods
 * **`get()`** → returns the current AST node (no building step required)
-* **Public API** → `buildFluentApi` merges builder + AST proxy
+* **Public API** → `buildFluentApi` merges builder + AST proxy + supports both creation modes
 * **Modifiers** → always `$` prefixed (`$export`, `$abstract`, `$readonly`)
 * **Dynamic additions** → `addMember()`, `addChild()`, `addTypeParam()` update AST directly
+* **⚠️ TRIVIA PRESERVATION** → All builders MUST support adopting existing nodes to preserve comments/decorators
 
-> Following this ensures all new APIs are **consistent, fluent, and fully compatible** with TypeScript AST and your DSL.
+> Following this ensures all new APIs are **consistent, fluent, trivia-preserving, and fully compatible** with TypeScript AST and your DSL.

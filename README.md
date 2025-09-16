@@ -6,6 +6,8 @@ A lightweight TypeScript DSL for AST construction and code generation. Makes cod
 ## Key Features
 
 - **Native TypeScript AST**: Returns actual `ts.MethodDeclaration`, `ts.ClassDeclaration`, etc.
+- **Trivia Preservation**: Automatically preserves comments, decorators, and JSDoc
+- **Dual API Pattern**: Create new nodes or adopt existing ones (preserving all trivia)
 - **Interoperable**: Mix and match with `ts.factory` functions
 - **Simple API**: Clean, minimal interface with fluent chaining
 - **No Wrapper Types**: Direct access to TypeScript AST nodes
@@ -26,6 +28,7 @@ npm install ts-flattered typescript
 
 ## Quick Start
 
+**Creating New Code:**
 ```typescript
 import { cls, method, param, block, call, $, sourceFile, writeAll } from "ts-flattered";
 
@@ -41,12 +44,25 @@ sourceFile("Dog.ts", [
 await writeAll({ outputDir: "./generated" });
 ```
 
+**Preserving Comments & Decorators:**
+```typescript
+import { prop, method } from "ts-flattered";
+
+// All existing trivia (comments, decorators) preserved automatically!
+const updatedClass = klass(existingClassNode)
+  .addProp(prop("newField", $string()).get())
+  .updateMethodsByFilter(
+    { name: "process" },
+    (method) => method.$async()
+  );
+```
+
 ## API Overview
 
-- **`sourceFile(name, statements)`** - Create a TypeScript file
-- **`klass(name, members?)`** - Create a class with optional members
-- **`method(name, params?, body?)`** - Create a method with optional params and body
-- **`prop(name, type?)`** - Create a property with optional type
+- **`sourceFile(name, statements)`** - Create a TypeScript file  
+- **`klass(name, members?)`** / **`klass(existingClass)`** - Create or adopt a class
+- **`method(name, params?, body?)`** / **`method(existingMethod)`** - Create or adopt a method
+- **`prop(name, type?)`** / **`prop(existingProperty)`** - Create or adopt a property
 - **`param(name, type?)`** - Create a method parameter
 - **`block(statements)`** - Create a code block
 - **`call(functionName, args?)`** - Create a function call

@@ -18,32 +18,35 @@ export class KlassBuilder implements BuildableAST {
     mods,
     typeParams,
     heritage,
-    from,
   }: {
-    name?: string;
+    name: string;
     members?: ts.ClassElement[];
     mods?: ts.ModifierLike[];
     typeParams?: ts.TypeParameterDeclaration[];
     heritage?: ts.HeritageClause[];
-    from?: ts.ClassDeclaration;
-  }) {
-    if (from) {
-      // Adopt from existing ClassDeclaration
-      this.#decl = from;
-    } else {
-      // Create new ClassDeclaration
-      if (!name) {
-        throw new Error(
-          "name is required when not adopting from existing ClassDeclaration",
-        );
-      }
+  });
+  constructor(from: ts.ClassDeclaration);
+  constructor(
+    optionsOrFrom:
+      | {
+          name: string;
+          members?: ts.ClassElement[];
+          mods?: ts.ModifierLike[];
+          typeParams?: ts.TypeParameterDeclaration[];
+          heritage?: ts.HeritageClause[];
+        }
+      | ts.ClassDeclaration
+  ) {
+    if ("name" in optionsOrFrom) {
       this.#decl = ts.factory.createClassDeclaration(
-        mods,
-        ts.factory.createIdentifier(name),
-        typeParams,
-        heritage,
-        members ?? [],
+        optionsOrFrom.mods,
+        ts.factory.createIdentifier(optionsOrFrom.name),
+        optionsOrFrom.typeParams,
+        optionsOrFrom.heritage,
+        optionsOrFrom.members ?? [],
       );
+    } else {
+      this.#decl = optionsOrFrom;
     }
   }
 
@@ -406,27 +409,8 @@ export class KlassBuilder implements BuildableAST {
 
     // Update each found property
     for (const foundProperty of foundProperties) {
-      const propertyBuilder = prop(
-        ts.isIdentifier(foundProperty.name)
-          ? foundProperty.name.text
-          : foundProperty.name!.getText(),
-        foundProperty.type,
-        !!foundProperty.questionToken,
-      );
-
-      // Apply existing modifiers
-      if (foundProperty.modifiers) {
-        foundProperty.modifiers.forEach((mod) => {
-          if (ts.isModifier(mod)) {
-            propertyBuilder.$mod(mod);
-          }
-        });
-      }
-
-      // Apply existing initializer
-      if (foundProperty.initializer) {
-        propertyBuilder.$init(foundProperty.initializer);
-      }
+      // Create property builder from existing property to preserve decorators and comments
+      const propertyBuilder = prop(foundProperty);
 
       const updatedProperty = updateFn(propertyBuilder);
       updatedProperties.push(updatedProperty);
@@ -551,14 +535,8 @@ export class KlassBuilder implements BuildableAST {
 
     // Update each found method
     for (const foundMethod of foundMethods) {
-      const methodBuilderInstance = methodBuilder(
-        ts.isIdentifier(foundMethod.name)
-          ? foundMethod.name.text
-          : foundMethod.name!.getText(),
-        Array.from(foundMethod.parameters),
-        foundMethod.body!,
-        foundMethod.modifiers ? Array.from(foundMethod.modifiers) : undefined,
-      );
+      // Create method builder from existing method to preserve decorators and comments
+      const methodBuilderInstance = methodBuilder(foundMethod);
 
       const updatedMethod = updateFn(methodBuilderInstance);
       updatedMethods.push(updatedMethod);
@@ -691,21 +669,23 @@ export function klass(
 ): KlassBuilder & ts.ClassDeclaration;
 
 export function klass(
+  name: string,
+  members?: ts.ClassElement[],
+  mods?: ts.ModifierLike[]
+): ReturnType<typeof buildFluentApi>;
+export function klass(existingClass: ts.ClassDeclaration): ReturnType<typeof buildFluentApi>;
+export function klass(
   nameOrExisting: string | ts.ClassDeclaration,
   members: ts.ClassElement[] = [],
   mods?: ts.ModifierLike[],
 ) {
   if (typeof nameOrExisting === "string") {
-    // Standard creation with name
     return buildFluentApi(KlassBuilder, {
       name: nameOrExisting,
       members,
       mods,
     });
   } else {
-    // Adopt from existing ClassDeclaration
-    return buildFluentApi(KlassBuilder, {
-      from: nameOrExisting,
-    });
+    return buildFluentApi(KlassBuilder, nameOrExisting);
   }
 }

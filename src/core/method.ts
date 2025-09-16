@@ -24,17 +24,34 @@ class MethodBuilder implements BuildableAST {
     mods?: ts.ModifierLike[];
     typeParams?: ts.TypeParameterDeclaration[];
     returnType?: ts.TypeNode;
-  }) {
-    this.#decl = ts.factory.createMethodDeclaration(
-      mods,
-      undefined, // asterisk token
-      name,
-      undefined, // question token
-      typeParams,
-      args,
-      returnType,
-      body,
-    );
+  });
+  constructor(from: ts.MethodDeclaration);
+  constructor(
+    optionsOrFrom:
+      | {
+          name: string;
+          args: ts.ParameterDeclaration[];
+          body: ts.Block;
+          mods?: ts.ModifierLike[];
+          typeParams?: ts.TypeParameterDeclaration[];
+          returnType?: ts.TypeNode;
+        }
+      | ts.MethodDeclaration
+  ) {
+    if ("name" in optionsOrFrom) {
+      this.#decl = ts.factory.createMethodDeclaration(
+        optionsOrFrom.mods,
+        undefined,
+        optionsOrFrom.name,
+        undefined,
+        optionsOrFrom.typeParams,
+        optionsOrFrom.args,
+        optionsOrFrom.returnType,
+        optionsOrFrom.body,
+      );
+    } else {
+      this.#decl = optionsOrFrom;
+    }
   }
 
   // Fluent modifier methods
@@ -374,9 +391,25 @@ class MethodBuilder implements BuildableAST {
   }
 }
 
-export const method = (
+export function method(
   name: string,
   args: ts.ParameterDeclaration[],
   body: ts.Block,
+  mods?: ts.ModifierLike[]
+): ReturnType<typeof buildFluentApi>;
+export function method(existingMethod: ts.MethodDeclaration): ReturnType<typeof buildFluentApi>;
+export function method(
+  nameOrMethod: string | ts.MethodDeclaration,
+  args?: ts.ParameterDeclaration[],
+  body?: ts.Block,
   mods?: ts.ModifierLike[],
-) => buildFluentApi(MethodBuilder, { name, args, body, mods });
+) {
+  if (typeof nameOrMethod === "string") {
+    if (!args || !body) {
+      throw new Error("args and body are required when creating a new method");
+    }
+    return buildFluentApi(MethodBuilder, { name: nameOrMethod, args, body, mods });
+  } else {
+    return buildFluentApi(MethodBuilder, nameOrMethod);
+  }
+}

@@ -24,16 +24,26 @@ class PropBuilder implements BuildableAST {
     name: string;
     type?: ts.TypeNode;
     optional?: boolean;
-  }) {
-    this.#decl = ts.factory.createPropertyDeclaration(
-      undefined, // modifiers
-      name,
-      optional
-        ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
-        : undefined,
-      type,
-      undefined, // initializer
-    );
+  });
+  constructor(from: ts.PropertyDeclaration);
+  constructor(
+    optionsOrFrom:
+      | { name: string; type?: ts.TypeNode; optional?: boolean }
+      | ts.PropertyDeclaration
+  ) {
+    if ("name" in optionsOrFrom) {
+      this.#decl = ts.factory.createPropertyDeclaration(
+        undefined,
+        optionsOrFrom.name,
+        optionsOrFrom.optional
+          ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+          : undefined,
+        optionsOrFrom.type,
+        undefined,
+      );
+    } else {
+      this.#decl = optionsOrFrom;
+    }
   }
 
   // Fluent modifier methods
@@ -354,5 +364,16 @@ class PropBuilder implements BuildableAST {
   }
 }
 
-export const prop = (name: string, type?: ts.TypeNode, optional?: boolean) =>
-  buildFluentApi(PropBuilder, { name, type, optional });
+export function prop(name: string, type?: ts.TypeNode, optional?: boolean): ReturnType<typeof buildFluentApi>;
+export function prop(existingProperty: ts.PropertyDeclaration): ReturnType<typeof buildFluentApi>;
+export function prop(
+  nameOrProperty: string | ts.PropertyDeclaration,
+  type?: ts.TypeNode,
+  optional?: boolean
+) {
+  if (typeof nameOrProperty === "string") {
+    return buildFluentApi(PropBuilder, { name: nameOrProperty, type, optional });
+  } else {
+    return buildFluentApi(PropBuilder, nameOrProperty);
+  }
+}

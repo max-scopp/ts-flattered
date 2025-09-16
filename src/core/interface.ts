@@ -19,14 +19,30 @@ class InterfaceBuilder implements BuildableAST {
     mods?: ts.ModifierLike[];
     typeParams?: ts.TypeParameterDeclaration[];
     heritage?: ts.HeritageClause[];
-  }) {
-    this.#decl = ts.factory.createInterfaceDeclaration(
-      mods,
-      ts.factory.createIdentifier(name),
-      typeParams,
-      heritage,
-      members ?? [],
-    );
+  });
+  constructor(from: ts.InterfaceDeclaration);
+  constructor(
+    optionsOrFrom:
+      | {
+          name: string;
+          members?: ts.TypeElement[];
+          mods?: ts.ModifierLike[];
+          typeParams?: ts.TypeParameterDeclaration[];
+          heritage?: ts.HeritageClause[];
+        }
+      | ts.InterfaceDeclaration
+  ) {
+    if ("name" in optionsOrFrom) {
+      this.#decl = ts.factory.createInterfaceDeclaration(
+        optionsOrFrom.mods,
+        ts.factory.createIdentifier(optionsOrFrom.name),
+        optionsOrFrom.typeParams,
+        optionsOrFrom.heritage,
+        optionsOrFrom.members ?? [],
+      );
+    } else {
+      this.#decl = optionsOrFrom;
+    }
   }
 
   // Fluent modifier methods
@@ -284,8 +300,20 @@ class InterfaceBuilder implements BuildableAST {
  * @param members Optional interface members
  * @param mods Optional modifiers
  */
-export const interface_ = (
+export function interface_(
   name: string,
+  members?: ts.TypeElement[],
+  mods?: ts.ModifierLike[]
+): ReturnType<typeof buildFluentApi>;
+export function interface_(existingInterface: ts.InterfaceDeclaration): ReturnType<typeof buildFluentApi>;
+export function interface_(
+  nameOrInterface: string | ts.InterfaceDeclaration,
   members: ts.TypeElement[] = [],
   mods?: ts.ModifierLike[],
-) => buildFluentApi(InterfaceBuilder, { name, members, mods });
+) {
+  if (typeof nameOrInterface === "string") {
+    return buildFluentApi(InterfaceBuilder, { name: nameOrInterface, members, mods });
+  } else {
+    return buildFluentApi(InterfaceBuilder, nameOrInterface);
+  }
+}
