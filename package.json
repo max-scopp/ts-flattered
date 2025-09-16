@@ -43,7 +43,8 @@
   "type": "module",
   "devDependencies": {
     "@types/babel__code-frame": "~7.0.6",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "latest"
   },
   "files": [
     "dist",
@@ -53,7 +54,7 @@
     "ts-morph": "^26.0.0"
   },
   "peerDependencies": {
-    "typescript": ">=5.9.2"
+    "typescript": "*"
   },
   "scripts": {
     "build": "tsdown"
