@@ -31,18 +31,22 @@ class PropBuilder implements BuildableAST {
       | { name: string; type?: ts.TypeNode; optional?: boolean }
       | ts.PropertyDeclaration
   ) {
-    if ("name" in optionsOrFrom) {
+    // Check if it's a TypeScript PropertyDeclaration by checking for required Node properties
+    if (optionsOrFrom && typeof optionsOrFrom === 'object' && 'kind' in optionsOrFrom && 'pos' in optionsOrFrom) {
+      // Adopt existing property - preserves all decorators and trivia
+      this.#decl = optionsOrFrom as ts.PropertyDeclaration;
+    } else {
+      // Create new property from options
+      const options = optionsOrFrom as { name: string; type?: ts.TypeNode; optional?: boolean };
       this.#decl = ts.factory.createPropertyDeclaration(
         undefined,
-        optionsOrFrom.name,
-        optionsOrFrom.optional
+        options.name,
+        options.optional
           ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
           : undefined,
-        optionsOrFrom.type,
+        options.type,
         undefined,
       );
-    } else {
-      this.#decl = optionsOrFrom;
     }
   }
 
@@ -359,13 +363,72 @@ class PropBuilder implements BuildableAST {
     return this;
   }
 
+  // ========== Async Method Variants ==========
+
+  /**
+   * Async version of updateDecoratorsByFilter - allows async callback functions
+   */
+  async updateDecoratorsByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<Array<ReturnType<typeof fromDecorator>>> {
+    // Use findDecorators to get matching decorators
+    const foundDecorators = findDecorators(this.#decl, options);
+    const updatedDecorators: Array<ReturnType<typeof fromDecorator>> = [];
+
+    if (foundDecorators.length === 0 || !this.#decl.modifiers) {
+      return updatedDecorators;
+    }
+
+    // Update each found decorator asynchronously
+    for (const foundDecorator of foundDecorators) {
+      const decoratorBuilder = fromDecorator(foundDecorator);
+      const updatedDecorator = await updateFn(decoratorBuilder);
+      updatedDecorators.push(updatedDecorator);
+
+      // Update the property with the new decorator
+      const updatedModifiers = this.#decl.modifiers!.map((modifier) => {
+        if (modifier === foundDecorator) {
+          return updatedDecorator.get();
+        }
+        return modifier;
+      });
+
+      this.#decl = ts.factory.updatePropertyDeclaration(
+        this.#decl,
+        updatedModifiers,
+        this.#decl.name,
+        this.#decl.questionToken,
+        this.#decl.type,
+        this.#decl.initializer,
+      );
+    }
+
+    return updatedDecorators;
+  }
+
+  /**
+   * Async version of updateDecoratorByFilter - allows async callback functions
+   */
+  async updateDecoratorByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    const results = await this.updateDecoratorsByFilterAsync(options, updateFn);
+    return results.length > 0 ? results[0] : undefined;
+  }
+
   get(): ts.PropertyDeclaration {
     return this.#decl;
   }
 }
 
-export function prop(name: string, type?: ts.TypeNode, optional?: boolean): ReturnType<typeof buildFluentApi>;
-export function prop(existingProperty: ts.PropertyDeclaration): ReturnType<typeof buildFluentApi>;
+export function prop(name: string, type?: ts.TypeNode, optional?: boolean): PropBuilder & ts.PropertyDeclaration;
+export function prop(existingProperty: ts.PropertyDeclaration): PropBuilder & ts.PropertyDeclaration;
 export function prop(
   nameOrProperty: string | ts.PropertyDeclaration,
   type?: ts.TypeNode,

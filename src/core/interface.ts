@@ -32,7 +32,11 @@ class InterfaceBuilder implements BuildableAST {
         }
       | ts.InterfaceDeclaration
   ) {
-    if ("name" in optionsOrFrom) {
+    if ("kind" in optionsOrFrom && "pos" in optionsOrFrom) {
+      // Adopting existing AST node - preserves trivia
+      this.#decl = optionsOrFrom;
+    } else {
+      // Creating new node from options
       this.#decl = ts.factory.createInterfaceDeclaration(
         optionsOrFrom.mods,
         ts.factory.createIdentifier(optionsOrFrom.name),
@@ -40,8 +44,6 @@ class InterfaceBuilder implements BuildableAST {
         optionsOrFrom.heritage,
         optionsOrFrom.members ?? [],
       );
-    } else {
-      this.#decl = optionsOrFrom;
     }
   }
 
@@ -304,8 +306,8 @@ export function interface_(
   name: string,
   members?: ts.TypeElement[],
   mods?: ts.ModifierLike[]
-): ReturnType<typeof buildFluentApi>;
-export function interface_(existingInterface: ts.InterfaceDeclaration): ReturnType<typeof buildFluentApi>;
+): InterfaceBuilder & ts.InterfaceDeclaration;
+export function interface_(existingInterface: ts.InterfaceDeclaration): InterfaceBuilder & ts.InterfaceDeclaration;
 export function interface_(
   nameOrInterface: string | ts.InterfaceDeclaration,
   members: ts.TypeElement[] = [],

@@ -350,7 +350,7 @@ class DecoratorBuilder implements BuildableAST {
     }
 
     const currentArgs = [...this.#decorator.expression.arguments];
-    
+
     // Extend args array if needed
     while (currentArgs.length <= index) {
       currentArgs.push(ts.factory.createNull());
@@ -441,7 +441,7 @@ class DecoratorBuilder implements BuildableAST {
     // Now we know it's a call expression
     const callExpression = this.#decorator.expression as ts.CallExpression;
     const currentArgs = [...callExpression.arguments];
-    
+
     // Extend args array if needed with null placeholders
     while (currentArgs.length <= index) {
       currentArgs.push(ts.factory.createNull());
@@ -450,7 +450,7 @@ class DecoratorBuilder implements BuildableAST {
     // Get or create the object at the specified index
     let objectBuilder: ReturnType<typeof objLiteral>;
     const existingArg = currentArgs[index];
-    
+
     if (existingArg && ts.isObjectLiteralExpression(existingArg)) {
       // Use existing object
       objectBuilder = objLiteral(existingArg);
@@ -461,7 +461,7 @@ class DecoratorBuilder implements BuildableAST {
 
     // Apply the update function
     const updatedObject = updateFn(objectBuilder);
-    
+
     // Update the argument with the new object
     currentArgs[index] = updatedObject.get();
 
@@ -493,6 +493,63 @@ class DecoratorBuilder implements BuildableAST {
       return value ? ts.factory.createTrue() : ts.factory.createFalse();
     }
     return ts.factory.createStringLiteral(String(value));
+  }
+
+  // ========== Async Method Variants ==========
+
+  /**
+   * Async version of updateArgumentObject - allows async callback functions
+   */
+  async updateArgumentObjectAsync(
+    index: number,
+    updateFn: (objBuilder: ReturnType<typeof objLiteral>) => Promise<ReturnType<typeof objLiteral>>
+  ): Promise<DecoratorBuilder> {
+    // Ensure we have a call expression
+    if (!ts.isCallExpression(this.#decorator.expression)) {
+      const callExpression = ts.factory.createCallExpression(
+        this.#decorator.expression,
+        undefined,
+        []
+      );
+      this.#decorator = ts.factory.createDecorator(callExpression);
+    }
+
+    // Now we know it's a call expression
+    const callExpression = this.#decorator.expression as ts.CallExpression;
+    const currentArgs = [...callExpression.arguments];
+
+    // Extend args array if needed with null placeholders
+    while (currentArgs.length <= index) {
+      currentArgs.push(ts.factory.createNull());
+    }
+
+    // Get or create the object at the specified index
+    let objectBuilder: ReturnType<typeof objLiteral>;
+    const existingArg = currentArgs[index];
+
+    if (existingArg && ts.isObjectLiteralExpression(existingArg)) {
+      // Use existing object
+      objectBuilder = objLiteral(existingArg);
+    } else {
+      // Create new empty object
+      objectBuilder = objLiteral();
+    }
+
+    // Apply the update function asynchronously
+    const updatedObject = await updateFn(objectBuilder);
+
+    // Update the argument with the new object
+    currentArgs[index] = updatedObject.get();
+
+    const newCallExpression = ts.factory.updateCallExpression(
+      callExpression,
+      callExpression.expression,
+      callExpression.typeArguments,
+      currentArgs
+    );
+
+    this.#decorator = ts.factory.createDecorator(newCallExpression);
+    return this;
   }
 
   get(): ts.Decorator {

@@ -7,6 +7,7 @@ A lightweight TypeScript DSL for AST construction and code generation. Makes cod
 
 - **Native TypeScript AST**: Returns actual `ts.MethodDeclaration`, `ts.ClassDeclaration`, etc.
 - **Trivia Preservation**: Automatically preserves comments, decorators, and JSDoc
+- **Promise Support**: All methods are promise-able but not required (async/sync compatible)
 - **Dual API Pattern**: Create new nodes or adopt existing ones (preserving all trivia)
 - **Interoperable**: Mix and match with `ts.factory` functions
 - **Simple API**: Clean, minimal interface with fluent chaining
@@ -55,6 +56,10 @@ const updatedClass = klass(existingClassNode)
     { name: "process" },
     (method) => method.$async()
   );
+
+// Promise support - any method can be awaited if needed
+const asyncResult = await klass(existingClassNode)
+  .$export();
 ```
 
 ## API Overview

@@ -1,4 +1,26 @@
-# ts-flattered API Reference
+# ## 🔧 Trivia Preservation & Promise Support
+
+**All APIs support trivia preservation automatically!** TypeScript AST nodes created with `setParentNodes: true` (which ts-flattered always uses) preserve comments, decorators, and JSDoc automatically.
+
+**All methods are promise-able but not required!** Every method can optionally return a Promise, enabling async operations while maintaining full synchronous compatibility.
+
+**Two Patterns for Each Builder:**
+
+1. **Create New** - Build from scratch using string parameters
+2. **Adopt Existing** - Pass existing AST nodes to preserve all trivia (comments, decorators, JSDoc)
+
+```typescript
+// Create new (no existing trivia)
+const newProp = prop("name", $string());
+
+// Adopt existing (preserves ALL trivia)
+const updatedProp = prop(existingPropertyNode)
+  .$readonly(); // Comments and decorators preserved!
+
+// Both support promise-able operations
+const asyncProp = await prop("asyncField", $string())
+  .$readonly(); // Can await any method if needed
+```Reference
 
 ## � Trivia Preservation
 
@@ -51,9 +73,9 @@ Create class declarations with fluent chaining.
 **Signatures:**
 ```typescript
 // Create new class
-klass(name: string, members?: ts.ClassElement[], mods?: ts.ModifierLike[])
+klass(name: string, members?: ts.ClassElement[], mods?: ts.ModifierLike[]): Promisable<KlassBuilder> & ts.ClassDeclaration
 // Adopt existing class (preserves trivia)
-klass(existingClass: ts.ClassDeclaration)
+klass(existingClass: ts.ClassDeclaration): Promisable<KlassBuilder> & ts.ClassDeclaration
 ```
 
 **Chainable (Create New):**
@@ -79,6 +101,10 @@ const userClass = klass("User", [
 const updatedClass = klass(existingClassNode)
   .$export()
   .addProp(prop("newField", $string()).get());
+
+// Promise-able operations
+const asyncClass = await klass(existingClassNode)
+  .$export(); // Can await any method if needed
 ```
 
 ---
@@ -91,9 +117,9 @@ Create function declarations.
 **Signatures:**
 ```typescript
 // Create new function
-func(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[])
+func(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[]): FunctionBuilder & ts.FunctionDeclaration
 // Adopt existing function (preserves trivia)
-func(existingFunction: ts.FunctionDeclaration)
+func(existingFunction: ts.FunctionDeclaration): FunctionBuilder & ts.FunctionDeclaration
 ```
 
 **Chainable (Create New):**
@@ -145,9 +171,9 @@ Create class method declarations.
 **Signatures:**
 ```typescript
 // Create new method
-method(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[])
+method(name: string, args: ts.ParameterDeclaration[], body: ts.Block, mods?: ts.ModifierLike[]): MethodBuilder & ts.MethodDeclaration
 // Adopt existing method (preserves trivia)
-method(existingMethod: ts.MethodDeclaration)
+method(existingMethod: ts.MethodDeclaration): MethodBuilder & ts.MethodDeclaration
 ```
 
 **Chainable (Create New):**
@@ -185,9 +211,9 @@ Create class property declarations.
 **Signatures:**
 ```typescript
 // Create new property
-prop(name: string, type?: ts.TypeNode, optional?: boolean)
+prop(name: string, type?: ts.TypeNode, optional?: boolean): PropBuilder & ts.PropertyDeclaration
 // Adopt existing property (preserves trivia)
-prop(existingProperty: ts.PropertyDeclaration)
+prop(existingProperty: ts.PropertyDeclaration): PropBuilder & ts.PropertyDeclaration
 ```
 
 **Chainable (Create New):**

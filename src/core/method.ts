@@ -38,19 +38,21 @@ class MethodBuilder implements BuildableAST {
         }
       | ts.MethodDeclaration
   ) {
-    if ("name" in optionsOrFrom) {
+    if ("kind" in optionsOrFrom && "pos" in optionsOrFrom) {
+      // Adopting existing AST node - preserves trivia
+      this.#decl = optionsOrFrom;
+    } else {
+      // Creating new node from options
       this.#decl = ts.factory.createMethodDeclaration(
         optionsOrFrom.mods,
         undefined,
-        optionsOrFrom.name,
+        ts.factory.createIdentifier(optionsOrFrom.name),
         undefined,
         optionsOrFrom.typeParams,
         optionsOrFrom.args,
         optionsOrFrom.returnType,
         optionsOrFrom.body,
       );
-    } else {
-      this.#decl = optionsOrFrom;
     }
   }
 
@@ -386,6 +388,165 @@ class MethodBuilder implements BuildableAST {
     return this;
   }
 
+  // ========== Async Method Variants ==========
+
+  /**
+   * Async version of updateDecoratorsByFilter - allows async callback functions
+   */
+  async updateDecoratorsByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<Array<ReturnType<typeof fromDecorator>>> {
+    // Use findDecorators to get matching decorators
+    const foundDecorators = findDecorators(this.#decl, options);
+    const updatedDecorators: Array<ReturnType<typeof fromDecorator>> = [];
+
+    if (foundDecorators.length === 0 || !this.#decl.modifiers) {
+      return updatedDecorators;
+    }
+
+    // Update each found decorator asynchronously
+    for (const foundDecorator of foundDecorators) {
+      const decoratorBuilder = fromDecorator(foundDecorator);
+      const updatedDecorator = await updateFn(decoratorBuilder);
+      updatedDecorators.push(updatedDecorator);
+
+      // Update the method with the new decorator
+      const updatedModifiers = this.#decl.modifiers!.map((modifier) => {
+        if (modifier === foundDecorator) {
+          return updatedDecorator.get();
+        }
+        return modifier;
+      });
+
+      this.#decl = ts.factory.updateMethodDeclaration(
+        this.#decl,
+        updatedModifiers,
+        this.#decl.asteriskToken,
+        this.#decl.name,
+        this.#decl.questionToken,
+        this.#decl.typeParameters,
+        this.#decl.parameters,
+        this.#decl.type,
+        this.#decl.body,
+      );
+    }
+
+    return updatedDecorators;
+  }
+
+  /**
+   * Async version of updateDecoratorByFilter - allows async callback functions
+   */
+  async updateDecoratorByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    const results = await this.updateDecoratorsByFilterAsync(options, updateFn);
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  /**
+   * Async version of updateDecoratorVerified - allows async callback functions
+   */
+  async updateDecoratorVerifiedAsync(
+    name: string,
+    sourceFile: ts.SourceFile,
+    module: string | undefined,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    const options: DecoratorFilterOptions = {
+      name,
+      sourceFile,
+    };
+    if (module) {
+      options.module = module;
+    }
+
+    return await this.updateDecoratorByFilterAsync(options, updateFn);
+  }
+
+  /**
+   * Async version of updateDecoratorByName - allows async callback functions
+   */
+  async updateDecoratorByNameAsync(
+    decoratorName: string,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    return await this.updateDecoratorAsync((decorator) => {
+      // Extract decorator name
+      let name = "";
+      if (
+        ts.isCallExpression(decorator.expression) &&
+        ts.isIdentifier(decorator.expression.expression)
+      ) {
+        name = decorator.expression.expression.text;
+      } else if (ts.isIdentifier(decorator.expression)) {
+        name = decorator.expression.text;
+      }
+      return name === decoratorName;
+    }, updateFn);
+  }
+
+  /**
+   * Async version of updateDecorator - allows async callback functions
+   */
+  async updateDecoratorAsync(
+    findCondition: (decorator: ts.Decorator) => boolean,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    if (!this.#decl.modifiers) {
+      return undefined;
+    }
+
+    // Find the decorator using the condition
+    const decoratorModifier = this.#decl.modifiers.find((modifier) => {
+      return ts.isDecorator(modifier) && findCondition(modifier);
+    }) as ts.Decorator | undefined;
+
+    if (!decoratorModifier) {
+      return undefined;
+    }
+
+    // Create a decorator builder from the existing decorator
+    const decoratorBuilder = fromDecorator(decoratorModifier);
+
+    // Apply the update function asynchronously
+    const updatedDecorator = await updateFn(decoratorBuilder);
+
+    // Update the method with the new decorator
+    const updatedModifiers = this.#decl.modifiers.map((modifier) => {
+      if (modifier === decoratorModifier) {
+        return updatedDecorator.get();
+      }
+      return modifier;
+    });
+
+    this.#decl = ts.factory.updateMethodDeclaration(
+      this.#decl,
+      updatedModifiers,
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.questionToken,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
+
+    return updatedDecorator;
+  }
+
   get(): ts.MethodDeclaration {
     return this.#decl;
   }
@@ -396,8 +557,8 @@ export function method(
   args: ts.ParameterDeclaration[],
   body: ts.Block,
   mods?: ts.ModifierLike[]
-): ReturnType<typeof buildFluentApi>;
-export function method(existingMethod: ts.MethodDeclaration): ReturnType<typeof buildFluentApi>;
+): MethodBuilder & ts.MethodDeclaration;
+export function method(existingMethod: ts.MethodDeclaration): MethodBuilder & ts.MethodDeclaration;
 export function method(
   nameOrMethod: string | ts.MethodDeclaration,
   args?: ts.ParameterDeclaration[],

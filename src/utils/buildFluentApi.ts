@@ -14,7 +14,7 @@ export interface BuildableAST {
  * - options: constructor options for the builder
  *
  * Returns: a merged object containing both:
- *   1. the latest AST node from build()
+ *   1. the latest AST node from get()
  *   2. all builder methods for fluent chaining
  */
 export function buildFluentApi<

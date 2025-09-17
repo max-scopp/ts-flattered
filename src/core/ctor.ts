@@ -123,8 +123,8 @@ class CtorBuilder implements BuildableAST {
 export function ctor(
   args: ts.ParameterDeclaration[],
   body: ts.Block
-): ReturnType<typeof buildFluentApi>;
-export function ctor(existingConstructor: ts.ConstructorDeclaration): ReturnType<typeof buildFluentApi>;
+): CtorBuilder & ts.ConstructorDeclaration;
+export function ctor(existingConstructor: ts.ConstructorDeclaration): CtorBuilder & ts.ConstructorDeclaration;
 export function ctor(
   argsOrConstructor: ts.ParameterDeclaration[] | ts.ConstructorDeclaration,
   body?: ts.Block,

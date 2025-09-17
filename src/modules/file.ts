@@ -608,6 +608,361 @@ class FileBuilder implements BuildableAST {
     return print(this.#sourceFile, postprocess);
   }
 
+  // ========== Async Method Variants ==========
+
+  /**
+   * Async version of updateClasses - allows async callback functions
+   */
+  async updateClassesAsync(
+    updateFn: (
+      classBuilder: ReturnType<typeof klass>,
+    ) => Promise<ReturnType<typeof klass>>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isClassDeclaration(statement)) {
+          // Create a klass builder for the existing class
+          const classBuilder = klass(statement);
+          // Apply the update function asynchronously
+          const updatedBuilder = await updateFn(classBuilder);
+          // Return the updated class declaration
+          return updatedBuilder.get();
+        }
+        return statement;
+      })
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateClass - allows async callback functions
+   */
+  async updateClassAsync(
+    className: string,
+    updateFn: (
+      classBuilder: ReturnType<typeof klass>,
+    ) => Promise<ReturnType<typeof klass>>,
+  ) {
+    return this.updateClassesAsync(async (classBuilder) => {
+      const classDecl = classBuilder.get();
+      if (classDecl.name?.text === className) {
+        return await updateFn(classBuilder);
+      }
+      return classBuilder;
+    });
+  }
+
+  /**
+   * Async version of updateFunctions - allows async callback functions
+   */
+  async updateFunctionsAsync(
+    updateFn: (statement: ts.FunctionDeclaration) => Promise<ts.FunctionDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isFunctionDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      })
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateFunction - allows async callback functions
+   */
+  async updateFunctionAsync(
+    functionName: string,
+    updateFn: (statement: ts.FunctionDeclaration) => Promise<ts.FunctionDeclaration>,
+  ) {
+    return this.updateFunctionsAsync(async (statement) => {
+      if (statement.name?.text === functionName) {
+        return await updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Async version of updateVariableStatements - allows async callback functions
+   */
+  async updateVariableStatementsAsync(
+    updateFn: (statement: ts.VariableStatement) => Promise<ts.VariableStatement>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isVariableStatement(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateVariable - allows async callback functions
+   */
+  async updateVariableAsync(
+    variableName: string,
+    updateFn: (statement: ts.VariableStatement) => Promise<ts.VariableStatement>,
+  ) {
+    return this.updateVariableStatementsAsync(async (statement) => {
+      // Check if this variable statement declares the target variable
+      const declaresVariable = statement.declarationList.declarations.some(
+        (declaration) =>
+          ts.isIdentifier(declaration.name) && declaration.name.text === variableName,
+      );
+      if (declaresVariable) {
+        return await updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Async version of updateInterfaces - allows async callback functions
+   */
+  async updateInterfacesAsync(
+    updateFn: (statement: ts.InterfaceDeclaration) => Promise<ts.InterfaceDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isInterfaceDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateInterface - allows async callback functions
+   */
+  async updateInterfaceAsync(
+    interfaceName: string,
+    updateFn: (statement: ts.InterfaceDeclaration) => Promise<ts.InterfaceDeclaration>,
+  ) {
+    return this.updateInterfacesAsync(async (statement) => {
+      if (statement.name.text === interfaceName) {
+        return await updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Async version of updateTypeAliases - allows async callback functions
+   */
+  async updateTypeAliasesAsync(
+    updateFn: (statement: ts.TypeAliasDeclaration) => Promise<ts.TypeAliasDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isTypeAliasDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateTypeAlias - allows async callback functions
+   */
+  async updateTypeAliasAsync(
+    aliasName: string,
+    updateFn: (statement: ts.TypeAliasDeclaration) => Promise<ts.TypeAliasDeclaration>,
+  ) {
+    return this.updateTypeAliasesAsync(async (statement) => {
+      if (statement.name.text === aliasName) {
+        return await updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Async version of updateEnums - allows async callback functions
+   */
+  async updateEnumsAsync(
+    updateFn: (statement: ts.EnumDeclaration) => Promise<ts.EnumDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isEnumDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateEnum - allows async callback functions
+   */
+  async updateEnumAsync(
+    enumName: string,
+    updateFn: (statement: ts.EnumDeclaration) => Promise<ts.EnumDeclaration>,
+  ) {
+    return this.updateEnumsAsync(async (statement) => {
+      if (statement.name.text === enumName) {
+        return await updateFn(statement);
+      }
+      return statement;
+    });
+  }
+
+  /**
+   * Async version of updateImports - allows async callback functions
+   */
+  async updateImportsAsync(
+    updateFn: (statement: ts.ImportDeclaration) => Promise<ts.ImportDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isImportDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Async version of updateExports - allows async callback functions
+   */
+  async updateExportsAsync(
+    updateFn: (statement: ts.ExportDeclaration) => Promise<ts.ExportDeclaration>,
+  ) {
+    const updatedStatements = await Promise.all(
+      this.#statements.map(async (statement) => {
+        if (ts.isExportDeclaration(statement)) {
+          return await updateFn(statement);
+        }
+        return statement;
+      }),
+    );
+
+    // Update the source file with the modified statements
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      updatedStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
   get(): ts.SourceFile {
     return this.#sourceFile;
   }

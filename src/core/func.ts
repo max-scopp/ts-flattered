@@ -38,18 +38,33 @@ class FunctionBuilder implements BuildableAST {
         }
       | ts.FunctionDeclaration
   ) {
-    if ("name" in optionsOrFrom) {
-      this.#decl = ts.factory.createFunctionDeclaration(
-        optionsOrFrom.mods,
-        undefined,
-        optionsOrFrom.name,
-        optionsOrFrom.typeParams,
-        optionsOrFrom.params ?? [],
-        optionsOrFrom.returnType,
-        optionsOrFrom.body,
-      );
-    } else {
+    if ("kind" in optionsOrFrom && ts.isFunctionDeclaration(optionsOrFrom)) {
+      // Adopting existing FunctionDeclaration
       this.#decl = optionsOrFrom;
+    } else {
+      // Creating new FunctionDeclaration from options
+      const options = optionsOrFrom as {
+        name: string;
+        params?: ts.ParameterDeclaration[];
+        body?: ts.Block;
+        mods?: ts.ModifierLike[];
+        typeParams?: ts.TypeParameterDeclaration[];
+        returnType?: ts.TypeNode;
+      };
+
+      const nameIdentifier = options.name
+        ? ts.factory.createIdentifier(options.name)
+        : undefined;
+
+      this.#decl = ts.factory.createFunctionDeclaration(
+        options.mods,
+        undefined,
+        nameIdentifier,
+        options.typeParams,
+        options.params ?? [],
+        options.returnType,
+        options.body,
+      );
     }
   }
 
@@ -269,6 +284,180 @@ class FunctionBuilder implements BuildableAST {
     ) => ReturnType<typeof fromDecorator>,
   ): ReturnType<typeof fromDecorator> | undefined {
     return this.updateDecorator((decorator) => {
+      // Extract decorator name
+      let name = "";
+      if (
+        ts.isCallExpression(decorator.expression) &&
+        ts.isIdentifier(decorator.expression.expression)
+      ) {
+        name = decorator.expression.expression.text;
+      } else if (ts.isIdentifier(decorator.expression)) {
+        name = decorator.expression.text;
+      }
+      return name === decoratorName;
+    }, updateFn);
+  }
+
+  // ========== Async Decorator Update Methods ==========
+
+  /**
+   * Async version of updateDecorator - Update a decorator on the function using an async callback function
+   * @param findCondition Function to determine which decorator to update (returns true for the target decorator)
+   * @param updateFn Async function that receives the existing decorator and returns the updated one
+   * @returns Promise of the updated decorator builder or undefined if not found
+   */
+  async updateDecoratorAsync(
+    findCondition: (decorator: ts.Decorator) => boolean,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    if (!this.#decl.modifiers) {
+      return undefined;
+    }
+
+    // Find the decorator using the condition
+    const decoratorModifier = this.#decl.modifiers.find((modifier) => {
+      return ts.isDecorator(modifier) && findCondition(modifier);
+    }) as ts.Decorator | undefined;
+
+    if (!decoratorModifier) {
+      return undefined;
+    }
+
+    // Create a decorator builder from the existing decorator
+    const decoratorBuilder = fromDecorator(decoratorModifier);
+
+    // Apply the async update function
+    const updatedDecorator = await updateFn(decoratorBuilder);
+
+    // Update the function with the new decorator
+    const updatedModifiers = this.#decl.modifiers.map((modifier) => {
+      if (modifier === decoratorModifier) {
+        return updatedDecorator.get();
+      }
+      return modifier;
+    });
+
+    this.#decl = ts.factory.updateFunctionDeclaration(
+      this.#decl,
+      updatedModifiers,
+      this.#decl.asteriskToken,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      this.#decl.parameters,
+      this.#decl.type,
+      this.#decl.body,
+    );
+
+    return updatedDecorator;
+  }
+
+  /**
+   * Async version of updateDecoratorsByFilter - Update decorator(s) using async callback
+   * @param options Decorator filter options (name, module, etc.)
+   * @param updateFn Async function that receives the existing decorator and returns the updated one
+   * @returns Promise of array of updated decorator builders
+   */
+  async updateDecoratorsByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<Array<ReturnType<typeof fromDecorator>>> {
+    // Use findDecorators to get matching decorators
+    const foundDecorators = findDecorators(this.#decl, options);
+    const updatedDecorators: Array<ReturnType<typeof fromDecorator>> = [];
+
+    if (foundDecorators.length === 0 || !this.#decl.modifiers) {
+      return updatedDecorators;
+    }
+
+    // Update each found decorator asynchronously
+    for (const foundDecorator of foundDecorators) {
+      const decoratorBuilder = fromDecorator(foundDecorator);
+      const updatedDecorator = await updateFn(decoratorBuilder);
+      updatedDecorators.push(updatedDecorator);
+
+      // Update the function with the new decorator
+      const updatedModifiers = this.#decl.modifiers!.map((modifier) => {
+        if (modifier === foundDecorator) {
+          return updatedDecorator.get();
+        }
+        return modifier;
+      });
+
+      this.#decl = ts.factory.updateFunctionDeclaration(
+        this.#decl,
+        updatedModifiers,
+        this.#decl.asteriskToken,
+        this.#decl.name,
+        this.#decl.typeParameters,
+        this.#decl.parameters,
+        this.#decl.type,
+        this.#decl.body,
+      );
+    }
+
+    return updatedDecorators;
+  }
+
+  /**
+   * Async version of updateDecoratorByFilter - Update the first decorator that matches the filter options
+   * @param options Decorator filter options (name, module, etc.)
+   * @param updateFn Async function that receives the existing decorator and returns the updated one
+   * @returns Promise of the updated decorator builder or undefined if not found
+   */
+  async updateDecoratorByFilterAsync(
+    options: DecoratorFilterOptions,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    const results = await this.updateDecoratorsByFilterAsync(options, updateFn);
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  /**
+   * Async version of updateDecoratorVerified - Update decorator by name with async callback
+   * @param name Decorator name
+   * @param sourceFile Source file for module resolution (required if module is specified)
+   * @param module Optional module to verify the import (e.g., '@angular/core')
+   * @param updateFn Async function that receives the existing decorator and returns the updated one
+   * @returns Promise of the updated decorator builder or undefined if not found
+   */
+  async updateDecoratorVerifiedAsync(
+    name: string,
+    sourceFile: ts.SourceFile,
+    module: string | undefined,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    const options: DecoratorFilterOptions = {
+      name,
+      sourceFile,
+    };
+    if (module) {
+      options.module = module;
+    }
+
+    return await this.updateDecoratorByFilterAsync(options, updateFn);
+  }
+
+  /**
+   * Async version of updateDecoratorByName - Update decorator by name with async callback
+   * @param decoratorName The name of the decorator to update
+   * @param updateFn Async function that receives the existing decorator and returns the updated one
+   * @returns Promise of the updated decorator builder or undefined if not found
+   */
+  async updateDecoratorByNameAsync(
+    decoratorName: string,
+    updateFn: (
+      decorator: ReturnType<typeof fromDecorator>,
+    ) => Promise<ReturnType<typeof fromDecorator>>,
+  ): Promise<ReturnType<typeof fromDecorator> | undefined> {
+    return await this.updateDecoratorAsync((decorator) => {
       // Extract decorator name
       let name = "";
       if (
