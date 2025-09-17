@@ -2,14 +2,14 @@ import ts from "typescript";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
 
 // Simple expression helpers
-export const id = (name: string): ts.Identifier =>
+export const expr = (name: string): ts.Identifier =>
   ts.factory.createIdentifier(name);
 
 export const propAccess = (
   expr: string | ts.Expression,
   name: string,
 ): ts.PropertyAccessExpression => {
-  const expression = typeof expr === "string" ? id(expr) : expr;
+  const expression = typeof expr === "string" ? expr(expr) : expr;
   return ts.factory.createPropertyAccessExpression(expression, name);
 };
 
@@ -18,7 +18,7 @@ export const newExpr = (
   args: ts.Expression[] = [],
   typeArgs?: ts.TypeNode[],
 ): ts.NewExpression => {
-  const expr = typeof expression === "string" ? id(expression) : expression;
+  const expr = typeof expression === "string" ? expr(expression) : expression;
   return ts.factory.createNewExpression(expr, typeArgs, args);
 };
 
