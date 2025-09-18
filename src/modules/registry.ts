@@ -1,71 +1,21 @@
 import type { SourceFile } from "./file";
-import { isRelativeImport, getImportModuleSpecifier, resolveImportPath, calculateNewImportPath } from "./pathUtils";
 import ts from "typescript";
+import path from "path";
 
-/**
- * Configuration for external dependency imports
- */
-export interface ExternalDependency {
-  /** The module specifier (e.g., "@angular/common/http") */
-  moduleSpecifier: string;
-  /** Named exports from this module */
-  namedExports?: string[];
-  /** Default export name */
-  defaultExport?: string;
-  /** Type-only exports */
-  typeOnlyExports?: string[];
-  /** Whether the default import is type-only */
-  isDefaultTypeOnly?: boolean;
-}
-
-/**
- * Information about an import dependency
- */
-export interface ImportDependency {
-  /** The importing file path */
-  fromFile: string;
-  /** The imported module specifier */
-  moduleSpecifier: string;
-  /** Whether this is a relative import */
-  isRelative: boolean;
-  /** The resolved absolute path (for relative imports) */
-  resolvedPath?: string;
-  /** The import declaration node */
-  importDeclaration: ts.ImportDeclaration;
-}
-
-/**
- * Registry to hold all SourceFile instances and track dependencies
- */
 export class SourceFileRegistry {
   private files = new Map<string, SourceFile>();
-  private externalDependencies = new Map<string, ExternalDependency>();
-  private importDependencies = new Map<string, ImportDependency[]>();
-  private fileLocations = new Map<string, string>(); // fileName -> filePath
 
   register(sourceFile: SourceFile, filePath?: string): void {
     const fileName = sourceFile.getFileName();
-    this.files.set(fileName, sourceFile);
-
-    if (filePath) {
-      this.fileLocations.set(fileName, filePath);
-    } else {
-      // Use the fileName as filePath if not provided
-      this.fileLocations.set(fileName, fileName);
-    }
-
-    // Analyze and store import dependencies
-    this.analyzeImportDependencies(sourceFile);
+    this.files.set(filePath || fileName, sourceFile);
   }
 
   registerFile(filePath: string, sourceFile: SourceFile): void {
-    this.register(sourceFile, filePath);
+    this.files.set(filePath, sourceFile);
   }
 
   unregister(fileName: string): void {
     this.files.delete(fileName);
-    this.importDependencies.delete(fileName);
-    this.fileLocations.delete(fileName);
   }
 
   get(fileName: string): SourceFile | undefined {
@@ -78,190 +28,307 @@ export class SourceFileRegistry {
 
   clear(): void {
     this.files.clear();
-    this.importDependencies.clear();
-    this.fileLocations.clear();
-    this.externalDependencies.clear();
   }
 
   /**
-   * Get the registered file path for a file name
+   * Update the path of a file in the registry
    */
-  getFilePath(fileName: string): string | undefined {
-    return this.fileLocations.get(fileName);
-  }
-
-  /**
-   * Update the file path for a registered file
-   */
-  updateFilePath(fileName: string, newPath: string): void {
-    if (this.files.has(fileName)) {
-      this.fileLocations.set(fileName, newPath);
+  updateFilePath(oldPath: string, newPath: string): void {
+    const sourceFile = this.files.get(oldPath);
+    if (sourceFile) {
+      this.files.delete(oldPath);
+      this.files.set(newPath, sourceFile);
     }
   }
 
-  /**
-   * Analyze import dependencies for a source file
-   */
-  private analyzeImportDependencies(sourceFile: SourceFile): void {
-    const fileName = sourceFile.getFileName();
-    const filePath = this.fileLocations.get(fileName) || fileName;
-    const dependencies: ImportDependency[] = [];
-
-    // Get all import declarations
-    const statements = sourceFile.getStatements();
-    for (const statement of statements) {
-      if (ts.isImportDeclaration(statement)) {
-        const moduleSpecifier = getImportModuleSpecifier(statement);
-        const isRelative = isRelativeImport(moduleSpecifier);
-
-        let resolvedPath: string | undefined;
-        if (isRelative) {
-          // For relative imports, resolve the absolute path
-          try {
-            resolvedPath = resolveImportPath(moduleSpecifier, filePath);
-          } catch {
-            // Path resolution failed, continue without resolved path
-          }
-        }
-
-        dependencies.push({
-          fromFile: filePath,
-          moduleSpecifier,
-          isRelative,
-          resolvedPath,
-          importDeclaration: statement,
-        });
-      }
-    }
-
-    this.importDependencies.set(fileName, dependencies);
-  }
-
-  /**
-   * Get import dependencies for a file
-   */
-  getImportDependencies(fileName: string): ImportDependency[] {
-    return this.importDependencies.get(fileName) || [];
-  }
-
-  /**
-   * Rewrite relative imports for all registered files when moving from one base to another
-   */
   rewriteAllRelativeImports(fromBase: string, toBase: string): void {
-    for (const [fileName, sourceFile] of this.files) {
-      const currentPath = this.fileLocations.get(fileName) || fileName;
+    console.log(`Moving files from "${fromBase}" to "${toBase}"`);
 
-      // Calculate new path
-      const relativePath = currentPath.startsWith(fromBase)
-        ? currentPath.substring(fromBase.length).replace(/^[\/\\]/, "")
-        : currentPath;
-      const newPath = `${toBase}/${relativePath}`.replace(/[\/\\]+/g, "/");
+    const newFiles = new Map<string, SourceFile>();
 
-      // Update file location
-      this.updateFilePath(fileName, newPath);
+    for (const [filePath, sourceFile] of this.files) {
+      console.log(`Processing: ${filePath}`);
 
-      // Rewrite imports in the file
-      this.rewriteFileImports(sourceFile, currentPath, newPath);
-    }
-  }
+      const newFilePath = this.calculateNewPath(filePath, fromBase, toBase);
+      console.log(`  -> ${newFilePath}`);
 
-  /**
-   * Rewrite imports in a specific file
-   */
-  private rewriteFileImports(sourceFile: SourceFile, oldPath: string, newPath: string): void {
-    sourceFile.updateImports((importDecl) => {
-      const moduleSpecifier = getImportModuleSpecifier(importDecl);
-
-      if (isRelativeImport(moduleSpecifier)) {
-        const newModuleSpecifier = calculateNewImportPath(moduleSpecifier, oldPath, newPath);
-
-        return ts.factory.updateImportDeclaration(
-          importDecl,
-          importDecl.modifiers,
-          importDecl.importClause,
-          ts.factory.createStringLiteral(newModuleSpecifier),
-          importDecl.attributes,
-        );
+      if (this.isPathCorrupted(newFilePath, filePath)) {
+        console.error(`Path corrupted, keeping original: ${newFilePath}`);
+        newFiles.set(filePath, sourceFile);
+        continue;
       }
 
-      return importDecl;
-    });
-
-    // Re-analyze dependencies after update
-    this.analyzeImportDependencies(sourceFile);
-  }
-
-  /**
-   * Get all files that import from a specific file
-   */
-  getFilesThatImport(targetFilePath: string): string[] {
-    const importingFiles: string[] = [];
-
-    for (const [fileName, dependencies] of this.importDependencies) {
-      const filePath = this.fileLocations.get(fileName) || fileName;
-
-      for (const dependency of dependencies) {
-        if (dependency.isRelative && dependency.resolvedPath) {
-          // Normalize paths for comparison
-          const normalizedTarget = targetFilePath.replace(/\\/g, "/");
-          const normalizedResolved = dependency.resolvedPath.replace(/\\/g, "/");
-
-          if (normalizedResolved.includes(normalizedTarget)) {
-            importingFiles.push(filePath);
-            break;
-          }
+      if (this.canUpdateImports(sourceFile)) {
+        try {
+          this.updateFileImports(sourceFile, filePath, newFilePath);
+          console.log(`  ✓ Imports updated`);
+        } catch (error) {
+          console.error(`  ❌ Import update failed:`, error);
         }
       }
+
+      this.setFileName(sourceFile, newFilePath);
+      newFiles.set(newFilePath, sourceFile);
     }
 
-    return importingFiles;
+    this.files = newFiles;
+    console.log(`Registry now contains ${this.files.size} files`);
+  }
+
+  private calculateNewPath(filePath: string, fromBase: string, toBase: string): string {
+    try {
+      // Normalize paths to use consistent separators
+      const normalizedFilePath = path.normalize(filePath);
+      const normalizedFromBase = path.normalize(fromBase);
+      const normalizedToBase = path.normalize(toBase);
+
+      console.log(`    Calculating: "${normalizedFilePath}" from "${normalizedFromBase}" to "${normalizedToBase}"`);
+
+      // Check if the file path starts with the fromBase
+      if (normalizedFilePath.startsWith(normalizedFromBase)) {
+        // Extract the relative part after fromBase
+        let relativePart = normalizedFilePath.substring(normalizedFromBase.length);
+
+        // Remove leading path separator if present
+        if (relativePart.startsWith('/') || relativePart.startsWith('\\')) {
+          relativePart = relativePart.substring(1);
+        }
+
+        // Join the relative part with the new base
+        const newPath = path.join(normalizedToBase, relativePart);
+        console.log(`    Result: "${newPath}"`);
+        return newPath;
+      } else {
+        // If file is not under fromBase, use simple string replacement
+        const newPath = normalizedFilePath.replace(normalizedFromBase, normalizedToBase);
+        console.log(`    Fallback result: "${newPath}"`);
+        return newPath;
+      }
+    } catch (error) {
+      console.error(`Error calculating new path for "${filePath}":`, error);
+      return filePath; // Return original on error
+    }
+  }  private isPathCorrupted(newPath: string, originalPath: string): boolean {
+    try {
+      // Check for obvious corruption patterns
+      if (newPath.includes('componentsrc/out') ||
+          newPath.includes('srcout') ||
+          newPath.includes('tsxtsx') ||
+          newPath.includes('srcsrc')) {
+        return true;
+      }
+
+      // Check if path length has grown unreasonably
+      if (newPath.length > originalPath.length * 2) {
+        return true;
+      }
+
+      // Check if the path has become malformed
+      try {
+        path.parse(newPath);
+      } catch {
+        return true; // Path.parse failed, path is malformed
+      }
+
+      // Check if the new path has invalid characters or structure
+      if (newPath.includes('//') || newPath.includes('\\\\')) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return true; // Any error in validation means the path is likely corrupted
+    }
+  }
+
+  private canUpdateImports(sourceFile: SourceFile): boolean {
+    return typeof (sourceFile as any).updateImports === 'function';
+  }
+
+  private updateFileImports(sourceFile: SourceFile, oldPath: string, newPath: string): void {
+    // Validate the source file has proper AST structure
+    if (!this.isValidSourceFile(sourceFile)) {
+      console.warn(`  ⚠️  Source file has invalid AST structure, skipping import updates`);
+      return;
+    }
+
+    (sourceFile as any).updateImports((importDecl: ts.ImportDeclaration) => {
+      try {
+        // Validate the import declaration node
+        if (!this.isValidImportDeclaration(importDecl)) {
+          console.warn(`  ⚠️  Invalid import declaration, keeping original`);
+          return importDecl;
+        }
+
+        const moduleSpecifier = this.extractModuleSpecifier(importDecl);
+
+        if (!moduleSpecifier) {
+          console.warn(`  ⚠️  Could not extract module specifier, keeping original`);
+          return importDecl;
+        }
+
+        if (this.isRelativeImportPath(moduleSpecifier)) {
+          const newModuleSpecifier = this.calculateNewImportPath(moduleSpecifier, oldPath, newPath);
+          console.log(`    Rewriting: "${moduleSpecifier}" -> "${newModuleSpecifier}"`);
+
+          // Create a proper new import declaration with proper AST structure
+          return this.createUpdatedImportDeclaration(importDecl, newModuleSpecifier);
+        }
+
+        return importDecl;
+      } catch (error) {
+        console.error(`  ❌ Error processing import declaration:`, error);
+        return importDecl; // Return original on any error
+      }
+    });
   }
 
   /**
-   * Register an external dependency
+   * Validate that a source file has proper AST structure
    */
-  registerExternalDependency(dependency: ExternalDependency): void {
-    this.externalDependencies.set(dependency.moduleSpecifier, dependency);
+  private isValidSourceFile(sourceFile: SourceFile): boolean {
+    try {
+      const statements = sourceFile.getStatements();
+      return Array.isArray(statements) && statements.every(stmt =>
+        stmt && typeof stmt === 'object' && 'kind' in stmt
+      );
+    } catch {
+      return false;
+    }
   }
 
   /**
-   * Get an external dependency by module specifier
+   * Validate that an import declaration has proper AST structure
    */
-  getExternalDependency(
-    moduleSpecifier: string,
-  ): ExternalDependency | undefined {
-    return this.externalDependencies.get(moduleSpecifier);
+  private isValidImportDeclaration(importDecl: ts.ImportDeclaration): boolean {
+    return !!(
+      importDecl &&
+      importDecl.kind === ts.SyntaxKind.ImportDeclaration &&
+      importDecl.moduleSpecifier &&
+      typeof importDecl.moduleSpecifier === 'object'
+    );
   }
 
   /**
-   * Get all external dependencies
+   * Safely extract module specifier from import declaration
    */
-  getAllExternalDependencies(): Map<string, ExternalDependency> {
-    return new Map(this.externalDependencies);
+  private extractModuleSpecifier(importDecl: ts.ImportDeclaration): string | null {
+    try {
+      if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
+        const text = importDecl.moduleSpecifier.text;
+        return typeof text === 'string' ? text : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   /**
-   * Find external dependency by export name
+   * Check if import path is relative using proper path analysis
    */
-  findExternalDependencyByExport(
-    exportName: string,
-  ): ExternalDependency | undefined {
-    for (const dependency of this.externalDependencies.values()) {
-      if (
-        dependency.namedExports?.includes(exportName) ||
-        dependency.defaultExport === exportName ||
-        dependency.typeOnlyExports?.includes(exportName)
-      ) {
-        return dependency;
+  private isRelativeImportPath(importPath: string): boolean {
+    if (!importPath || typeof importPath !== 'string') {
+      return false;
+    }
+    return importPath.startsWith('./') || importPath.startsWith('../');
+  }
+
+  /**
+   * Calculate new import path using Node.js path utilities
+   */
+  private calculateNewImportPath(importPath: string, oldFilePath: string, newFilePath: string): string {
+    try {
+      // Get directory paths using Node.js path utilities
+      const oldDir = path.dirname(path.resolve(oldFilePath));
+      const newDir = path.dirname(path.resolve(newFilePath));
+
+      // Resolve the absolute path of the imported file from old location
+      const absoluteImportPath = path.resolve(oldDir, importPath);
+
+      // Calculate the new relative path from new location
+      let newRelativePath = path.relative(newDir, absoluteImportPath);
+
+      // Normalize path separators for cross-platform compatibility
+      newRelativePath = newRelativePath.replace(/\\/g, '/');
+
+      // Ensure proper relative path format
+      if (!newRelativePath.startsWith('.')) {
+        newRelativePath = './' + newRelativePath;
+      }
+
+      return newRelativePath;
+    } catch (error) {
+      console.error(`Error calculating new import path for "${importPath}":`, error);
+      return importPath; // Return original on error
+    }
+  }
+
+  /**
+   * Create a properly formed updated import declaration
+   */
+  private createUpdatedImportDeclaration(
+    originalDecl: ts.ImportDeclaration,
+    newModuleSpecifier: string
+  ): ts.ImportDeclaration {
+    try {
+      // Create a new string literal with proper AST structure
+      const newModuleSpecifierNode = ts.factory.createStringLiteral(newModuleSpecifier);
+
+      // Use TypeScript's factory to create a properly formed import declaration
+      return ts.factory.updateImportDeclaration(
+        originalDecl,
+        originalDecl.modifiers,
+        originalDecl.importClause,
+        newModuleSpecifierNode,
+        originalDecl.attributes,
+      );
+    } catch (error) {
+      console.error(`Error creating updated import declaration:`, error);
+      return originalDecl; // Return original on error
+    }
+  }
+
+  private setFileName(sourceFile: SourceFile, newPath: string): void {
+    try {
+      (sourceFile as any).fileName = newPath;
+    } catch {
+      // Ignore if readonly
+    }
+  }
+
+  writeAllFiles(): Map<string, string> {
+    const result = new Map<string, string>();
+
+    for (const [filePath, sourceFile] of this.files) {
+      try {
+        let content: string;
+
+        if (typeof (sourceFile as any).print === 'function') {
+          content = (sourceFile as any).print();
+        } else if (typeof sourceFile.getFullText === 'function') {
+          content = sourceFile.getFullText();
+        } else {
+          const printer = ts.createPrinter({ removeComments: false });
+          content = printer.printFile(sourceFile as any);
+        }
+
+        result.set(filePath, content);
+
+      } catch (error) {
+        console.error(`Failed to generate content for ${filePath}:`, error);
+        result.set(filePath, `// Error generating content`);
       }
     }
-    return undefined;
+
+    return result;
   }
 
-  /**
-   * Clear external dependencies
-   */
-  clearExternalDependencies(): void {
-    this.externalDependencies.clear();
+  debugState(): void {
+    console.log('=== REGISTRY ===');
+    console.log(`Files: ${this.files.size}`);
+    for (const [path, file] of this.files) {
+      console.log(`  ${path} (${file.getFileName()})`);
+    }
   }
 }

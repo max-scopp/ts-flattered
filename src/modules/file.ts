@@ -101,40 +101,110 @@ class FileBuilder implements BuildableAST {
     }
   }
 
-  // Methods for adding statements
-  addStatement(...statements: ts.Statement[]) {
-    // Create a new source file with the added statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      [...this.#statements, ...statements],
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+  /**
+   * Private helper to safely update the source file while preserving all properties
+   */
+  private updateSourceFile(newStatements: ts.Statement[]): void {
+    try {
+      // Create a new source file with preserved properties
+      this.#sourceFile = ts.factory.updateSourceFile(
+        this.#sourceFile,
+        newStatements,
+        this.#sourceFile.isDeclarationFile ?? false,
+        this.#sourceFile.referencedFiles ?? [],
+        this.#sourceFile.typeReferenceDirectives ?? [],
+        this.#sourceFile.hasNoDefaultLib ?? false,
+        this.#sourceFile.libReferenceDirectives ?? [],
+      );
 
-    // Update statements reference
-    this.#statements = this.#sourceFile.statements;
+      // Ensure the updated source file has all required properties
+      if (!this.#sourceFile.fileName) {
+        (this.#sourceFile as any).fileName = this.#originalPath || "";
+      }
+
+      // Update statements reference
+      this.#statements = this.#sourceFile.statements;
+    } catch (error) {
+      console.error("Error updating source file:", error);
+      // Fallback: recreate the source file from scratch
+      const content = ts.createPrinter().printFile(this.#sourceFile);
+      this.#sourceFile = ts.createSourceFile(
+        this.#sourceFile.fileName || this.#originalPath || "",
+        content,
+        this.#sourceFile.languageVersion ?? ts.ScriptTarget.Latest,
+        true // setParentNodes
+      );
+      this.#statements = this.#sourceFile.statements;
+    }
+  }
+
+  // Methods for adding statements
+  addStatement(...statements: (ts.Statement | string)[]) {
+    // Convert strings to proper AST nodes
+    const astStatements = statements.map(stmt => {
+      if (typeof stmt === 'string') {
+        return this.createStatementFromString(stmt);
+      }
+      return stmt;
+    });
+
+    // Create a new source file with the added statements
+    this.updateSourceFile([...this.#statements, ...astStatements]);
+
     return this;
   }
 
   // Method for adding statements at the beginning
-  prependStatement(...statements: ts.Statement[]) {
-    // Create a new source file with the prepended statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      [...statements, ...this.#statements],
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+  prependStatement(...statements: (ts.Statement | string)[]) {
+    // Convert strings to proper AST nodes
+    const astStatements = statements.map(stmt => {
+      if (typeof stmt === 'string') {
+        return this.createStatementFromString(stmt);
+      }
+      return stmt;
+    });
 
-    // Update statements reference
-    this.#statements = this.#sourceFile.statements;
+    // Create a new source file with the prepended statements
+    this.updateSourceFile([...astStatements, ...this.#statements]);
+
     return this;
+  }
+
+  /**
+   * Create a proper TypeScript AST statement from a string
+   */
+  private createStatementFromString(code: string): ts.Statement {
+    try {
+      // Create a temporary source file to parse the statement
+      const tempSourceFile = ts.createSourceFile(
+        'temp.ts',
+        code,
+        ts.ScriptTarget.Latest,
+        true
+      );
+
+      // Extract the first statement from the temporary source file
+      if (tempSourceFile.statements.length > 0) {
+        const statement = tempSourceFile.statements[0];
+
+        // Ensure the statement has proper AST structure
+        if (statement && statement.kind !== undefined) {
+          return statement;
+        }
+      }
+
+      // Fallback: create an expression statement from the string
+      // This handles simple expressions like "export const foo = 'bar';"
+      return ts.factory.createExpressionStatement(
+        ts.factory.createIdentifier('/* Failed to parse: ' + code.replace(/\*\//g, '') + ' */')
+      );
+    } catch (error) {
+      console.error('Error creating statement from string:', error);
+      // Create a comment statement as fallback
+      return ts.factory.createExpressionStatement(
+        ts.factory.createIdentifier('/* Error parsing: ' + code.replace(/\*\//g, '') + ' */')
+      );
+    }
   }
 
   addImport(options: ImportOptions) {
@@ -191,15 +261,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -238,15 +300,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -282,15 +336,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -331,15 +377,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -375,15 +413,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -417,15 +447,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -461,15 +483,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -490,15 +504,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -520,15 +526,7 @@ class FileBuilder implements BuildableAST {
     });
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -652,15 +650,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -701,15 +691,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -747,15 +729,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -798,15 +772,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -844,15 +810,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -890,15 +848,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -936,15 +886,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -967,15 +909,7 @@ class FileBuilder implements BuildableAST {
     );
 
     // Update the source file with the modified statements
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      updatedStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(updatedStatements);
 
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
@@ -1057,15 +991,7 @@ class FileBuilder implements BuildableAST {
       const newStatements = [...this.#statements];
       newStatements[existingImportIndex] = updatedImport;
 
-      this.#sourceFile = ts.factory.updateSourceFile(
-        this.#sourceFile,
-        newStatements,
-        this.#sourceFile.isDeclarationFile,
-        this.#sourceFile.referencedFiles,
-        this.#sourceFile.typeReferenceDirectives,
-        this.#sourceFile.hasNoDefaultLib,
-        this.#sourceFile.libReferenceDirectives,
-      );
+      this.updateSourceFile(newStatements);
     } else {
       // Add new import
       const newImport = imp(options).get();
@@ -1079,15 +1005,7 @@ class FileBuilder implements BuildableAST {
         const newStatements = [...this.#statements];
         newStatements.splice(position, 0, newImport);
 
-        this.#sourceFile = ts.factory.updateSourceFile(
-          this.#sourceFile,
-          newStatements,
-          this.#sourceFile.isDeclarationFile,
-          this.#sourceFile.referencedFiles,
-          this.#sourceFile.typeReferenceDirectives,
-          this.#sourceFile.hasNoDefaultLib,
-          this.#sourceFile.libReferenceDirectives,
-        );
+        this.updateSourceFile(newStatements);
       }
     }
 
@@ -1109,15 +1027,7 @@ class FileBuilder implements BuildableAST {
       return true;
     });
 
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      newStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(newStatements);
 
     this.#statements = this.#sourceFile.statements;
     return this;
@@ -1174,15 +1084,7 @@ class FileBuilder implements BuildableAST {
       return stmt;
     }).filter((stmt): stmt is ts.Statement => stmt !== null);
 
-    this.#sourceFile = ts.factory.updateSourceFile(
-      this.#sourceFile,
-      newStatements,
-      this.#sourceFile.isDeclarationFile,
-      this.#sourceFile.referencedFiles,
-      this.#sourceFile.typeReferenceDirectives,
-      this.#sourceFile.hasNoDefaultLib,
-      this.#sourceFile.libReferenceDirectives,
-    );
+    this.updateSourceFile(newStatements);
 
     this.#statements = this.#sourceFile.statements;
     return this;

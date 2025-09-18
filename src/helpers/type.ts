@@ -87,9 +87,9 @@ export function computeSimpleType(
     if (node.types.length > 0) {
       const firstType = node.types[0];
       const firstResult = computeSimpleType(checker, firstType);
-      
+
       // Check for nullable/undefinable flags in the union
-      const hasNull = node.types.some(t => 
+      const hasNull = node.types.some(t =>
         ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword
       );
       const hasUndefined = node.types.some(t =>
@@ -98,7 +98,7 @@ export function computeSimpleType(
       const hasVoid = node.types.some(t =>
         t.kind === ts.SyntaxKind.VoidKeyword
       );
-      
+
       return {
         ...firstResult,
         nullable: firstResult.nullable || hasNull,
@@ -112,36 +112,41 @@ export function computeSimpleType(
 
   // Handle type references to check for array type aliases
   if (ts.isTypeNode(node) && ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
-    const symbol = checker.getSymbolAtLocation(node.typeName);
-    if (symbol?.declarations) {
-      for (const declaration of symbol.declarations) {
-        if (ts.isTypeAliasDeclaration(declaration) && declaration.type) {
-          // Check if the aliased type is an array at the AST level
-          if (ts.isArrayTypeNode(declaration.type)) {
-            return {
-              type: 'array',
-              nullable: false,
-              undefinable: false,
-              voidable: false,
-              originalType: declaration.type.getText() || 'array'
-            };
-          }
-          
-          // Check if the aliased type is a generic Array<T>
-          if (ts.isTypeReferenceNode(declaration.type)) {
-            const typeName = declaration.type.typeName;
-            if (ts.isIdentifier(typeName) && typeName.text === 'Array') {
+    try {
+      const symbol = checker.getSymbolAtLocation(node.typeName);
+      if (symbol?.declarations) {
+        for (const declaration of symbol.declarations) {
+          if (ts.isTypeAliasDeclaration(declaration) && declaration.type) {
+            // Check if the aliased type is an array at the AST level
+            if (ts.isArrayTypeNode(declaration.type)) {
               return {
                 type: 'array',
                 nullable: false,
                 undefinable: false,
                 voidable: false,
-                originalType: declaration.type.getText() || 'Array'
+                originalType: declaration.type.getText() || 'array'
               };
+            }
+
+            // Check if the aliased type is a generic Array<T>
+            if (ts.isTypeReferenceNode(declaration.type)) {
+              const typeName = declaration.type.typeName;
+              if (ts.isIdentifier(typeName) && typeName.text === 'Array') {
+                return {
+                  type: 'array',
+                  nullable: false,
+                  undefinable: false,
+                  voidable: false,
+                  originalType: declaration.type.getText() || 'Array'
+                };
+              }
             }
           }
         }
       }
+    } catch (error) {
+      // If symbol resolution fails, continue with other type analysis
+      // This prevents crashes when TypeScript can't resolve symbols
     }
   }
 
@@ -192,13 +197,14 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
   if (ts.isArrayTypeNode(node)) {
     return { type: 'array', nullable: false, undefinable: false, voidable: false };
   }
-  
+
   if (ts.isTypeReferenceNode(node)) {
     // Look up the original type alias declaration
     const typeName = node.typeName;
     if (ts.isIdentifier(typeName)) {
-      const symbol = checker.getSymbolAtLocation(typeName);
-      if (symbol?.declarations) {
+      try {
+        const symbol = checker.getSymbolAtLocation(typeName);
+        if (symbol?.declarations) {
         for (const declaration of symbol.declarations) {
           if (ts.isTypeAliasDeclaration(declaration) && declaration.type) {
             // For generic type aliases, we need to consider the type arguments
@@ -211,7 +217,7 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
                   const secondTypeArg = node.typeArguments[1];
                   if (secondTypeArg) {
                     const secondTypeArgType = checker.getTypeFromTypeNode(secondTypeArg);
-                    
+
                     // If the second type argument is string, this should be a string type
                     if (secondTypeArgType.flags & ts.TypeFlags.String) {
                       return { type: 'string', nullable: false, undefinable: false, voidable: false };
@@ -219,7 +225,7 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
                   }
                 }
               }
-              
+
               // For other generic types, try to analyze the first type argument
               const firstTypeArg = node.typeArguments[0];
               if (firstTypeArg) {
@@ -229,14 +235,17 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
                 }
               }
             }
-            
+
             // Recursively analyze the aliased type structure
             return analyzeTypeNodeStructure(checker, declaration.type);
           }
         }
       }
+      } catch (error) {
+        // If symbol resolution fails, continue with other analysis
+      }
     }
-    
+
     // For generic types, try to analyze the type arguments
     if (node.typeArguments) {
       // Check if any type argument suggests this should be a string
@@ -248,21 +257,21 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
       }
     }
   }
-  
+
   if (ts.isUnionTypeNode(node)) {
     const memberAnalyses = node.types.map(t => analyzeTypeNodeStructure(checker, t)).filter(Boolean);
-    
+
     // Check for nullable/undefinable types
-    const nullable = node.types.some(t => 
+    const nullable = node.types.some(t =>
       ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword
     );
-    const undefinable = node.types.some(t => 
+    const undefinable = node.types.some(t =>
       t.kind === ts.SyntaxKind.UndefinedKeyword
     );
-    
+
     // Filter out null/undefined types
     const nonNullableAnalyses = memberAnalyses.filter(a => a?.type !== null);
-    
+
     if (nonNullableAnalyses.length === 1) {
       const first = nonNullableAnalyses[0];
       if (first) {
@@ -273,13 +282,13 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
         };
       }
     }
-    
+
     // If all non-nullable types are strings, return string
     if (nonNullableAnalyses.length > 0 && nonNullableAnalyses.every(a => a?.type === 'string')) {
       return { type: 'string', nullable, undefinable, voidable: false };
     }
   }
-  
+
   if (ts.isIntersectionTypeNode(node)) {
     // For intersection types, try to find the most specific type
     for (const intersectedType of node.types) {
@@ -290,21 +299,21 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
     }
     return { type: 'object', nullable: false, undefinable: false, voidable: false };
   }
-  
+
   if (ts.isLiteralTypeNode(node)) {
-    if (node.literal.kind === ts.SyntaxKind.StringLiteral || 
+    if (node.literal.kind === ts.SyntaxKind.StringLiteral ||
         node.literal.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral) {
       return { type: 'string', nullable: false, undefinable: false, voidable: false };
     }
     if (node.literal.kind === ts.SyntaxKind.NumericLiteral) {
       return { type: 'number', nullable: false, undefinable: false, voidable: false };
     }
-    if (node.literal.kind === ts.SyntaxKind.TrueKeyword || 
+    if (node.literal.kind === ts.SyntaxKind.TrueKeyword ||
         node.literal.kind === ts.SyntaxKind.FalseKeyword) {
       return { type: 'boolean', nullable: false, undefinable: false, voidable: false };
     }
   }
-  
+
   // Handle basic type keywords
   switch (node.kind) {
     case ts.SyntaxKind.StringKeyword:
@@ -314,7 +323,7 @@ function analyzeTypeNodeStructure(checker: ts.TypeChecker, node: ts.TypeNode): P
     case ts.SyntaxKind.BooleanKeyword:
       return { type: 'boolean', nullable: false, undefinable: false, voidable: false };
   }
-  
+
   return null;
 }
 
@@ -331,7 +340,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
   voidable: boolean;
 } | null {
   const visited = new Set<ts.Type>();
-  
+
   function resolve(currentType: ts.Type): {
     type: 'string' | 'number' | 'boolean' | 'function' | 'array' | 'object' | null;
     nullable: boolean;
@@ -347,20 +356,20 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
     // Handle union types
     if (currentType.flags & ts.TypeFlags.Union) {
       const unionType = currentType as ts.UnionType;
-      
+
       const nullable = unionType.types.some(t => t.flags & ts.TypeFlags.Null);
       const undefinable = unionType.types.some(t => t.flags & ts.TypeFlags.Undefined);
       const voidable = unionType.types.some(t => t.flags & ts.TypeFlags.Void);
-      
+
       // Filter out null, undefined, void
-      const nonNullableTypes = unionType.types.filter(t => 
+      const nonNullableTypes = unionType.types.filter(t =>
         !(t.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null | ts.TypeFlags.Void))
       );
-      
+
       if (nonNullableTypes.length === 0) {
         return { type: null, nullable, undefinable, voidable };
       }
-      
+
       if (nonNullableTypes.length === 1) {
         // Single non-nullable type - recurse into it
         const firstType = nonNullableTypes[0];
@@ -389,7 +398,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
             };
           }
         }
-        
+
         // Fallback to object if we can't resolve the first type
         return { type: 'object', nullable, undefinable, voidable };
       }
@@ -403,7 +412,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
           if (ts.isArrayTypeNode(declaration.type)) {
             return { type: 'array', nullable: false, undefinable: false, voidable: false };
           }
-          
+
           // Check if the aliased type is a generic Array<T>
           if (ts.isTypeReferenceNode(declaration.type)) {
             const typeName = declaration.type.typeName;
@@ -411,7 +420,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
               return { type: 'array', nullable: false, undefinable: false, voidable: false };
             }
           }
-          
+
           // Recursively resolve the aliased type
           try {
             const aliasedType = checker.getTypeFromTypeNode(declaration.type);
@@ -429,15 +438,15 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
     // Handle generic types and type references
     if (currentType.flags & ts.TypeFlags.Object) {
       const objectType = currentType as ts.ObjectType;
-      
+
       // Check if this is a generic type instantiation
       if (objectType.objectFlags & ts.ObjectFlags.Reference) {
         const typeReference = objectType as ts.TypeReference;
-        
+
         // Try to resolve the target type
         if (typeReference.target?.symbol) {
           const targetSymbol = typeReference.target.symbol;
-          
+
           // Look for the original type alias declaration
           if (targetSymbol.declarations) {
             for (const declaration of targetSymbol.declarations) {
@@ -448,7 +457,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
                   // check if any argument suggests the result should be a string type
                   if (typeReference.typeArguments.length >= 2) {
                     const secondArgType = typeReference.typeArguments[1];
-                    
+
                     // If one of the later arguments is string, this might be a string-extending pattern
                     if (secondArgType && secondArgType.flags & ts.TypeFlags.String) {
                       // Check if the alias type is a union that includes the first argument
@@ -457,7 +466,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
                       }
                     }
                   }
-                  
+
                   // General approach: analyze all type arguments
                   for (const typeArg of typeReference.typeArguments) {
                     if (typeArg.flags & (ts.TypeFlags.String | ts.TypeFlags.StringLiteral)) {
@@ -470,7 +479,7 @@ function resolveTypeRecursively(checker: ts.TypeChecker, type: ts.Type): {
                     }
                   }
                 }
-                
+
                 // General generic type resolution
                 try {
                   const aliasedType = checker.getTypeFromTypeNode(declaration.type);
@@ -554,8 +563,8 @@ function analyzeDirectType(checker: ts.TypeChecker, type: ts.Type): {
  */
 function isStringLikeType(type: ts.Type): boolean {
   return !!(type.flags & (
-    ts.TypeFlags.String | 
-    ts.TypeFlags.StringLiteral | 
+    ts.TypeFlags.String |
+    ts.TypeFlags.StringLiteral |
     ts.TypeFlags.TemplateLiteral
   ));
 }
@@ -565,7 +574,7 @@ function isStringLikeType(type: ts.Type): boolean {
  */
 function isNumberLikeType(type: ts.Type): boolean {
   return !!(type.flags & (
-    ts.TypeFlags.Number | 
+    ts.TypeFlags.Number |
     ts.TypeFlags.NumberLiteral |
     ts.TypeFlags.Enum |
     ts.TypeFlags.EnumLiteral
@@ -577,7 +586,7 @@ function isNumberLikeType(type: ts.Type): boolean {
  */
 function isBooleanLikeType(type: ts.Type): boolean {
   return !!(type.flags & (
-    ts.TypeFlags.Boolean | 
+    ts.TypeFlags.Boolean |
     ts.TypeFlags.BooleanLiteral
   ));
 }
@@ -618,10 +627,10 @@ export function computeConstructorType(
   node: ts.TypeNode | ts.Expression | undefined
 ): ts.Expression | null {
   const simpleType = computeSimpleType(checker, node);
-  
+
   // Return null for types that don't exist at runtime
   if (!simpleType.type) return null;
-  
+
   switch (simpleType.type) {
     case 'string':
       return expr("String");

@@ -5,6 +5,6 @@ export default defineConfig({
   outDir: "./dist",
   format: ["esm"],
   target: false,
-  sourcemap: true,
+  sourcemap: "inline",
   platform: "node",
 });

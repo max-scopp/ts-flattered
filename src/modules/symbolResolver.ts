@@ -85,10 +85,15 @@ export class SymbolResolver {
    * @returns The resolved symbol information or undefined if not found
    */
   getSymbolAtNode(node: ts.Node, sourceFile?: ts.SourceFile): ResolvedSymbol | undefined {
-    const symbol = this.#typeChecker.getSymbolAtLocation(node);
-    if (!symbol) return undefined;
+    try {
+      const symbol = this.#typeChecker.getSymbolAtLocation(node);
+      if (!symbol) return undefined;
 
-    return this.#createResolvedSymbol(symbol, sourceFile);
+      return this.#createResolvedSymbol(symbol, sourceFile);
+    } catch (error) {
+      // If symbol resolution fails, return undefined to prevent crashes
+      return undefined;
+    }
   }
 
   /**
