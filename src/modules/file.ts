@@ -8,8 +8,13 @@ import type {
   ParameterInfo,
 } from "../helpers/finder";
 import { type BuildableAST, buildFluentApi } from "../utils/buildFluentApi";
-import { type ImportOptions, imp } from "./imp";
+import { type ImportOptions, imp, mergeImportDeclarations, extractImportOptions } from "./imp";
 import { type PostprocessOptions, print } from "./print";
+import { calculateNewImportPath, isRelativeImport, getImportModuleSpecifier } from "./pathUtils";
+import type { SourceFileRegistry } from "./registry";
+
+// Re-export SourceFileRegistry for convenience
+export { SourceFileRegistry } from "./registry";
 /**
  * Type representing a SourceFile with the fluent API methods
  */
@@ -22,6 +27,8 @@ export interface SourceFileOptions {
   fileName: string;
   content: string;
   scriptTarget?: ts.ScriptTarget;
+  registry?: SourceFileRegistry;
+  autoRegister?: boolean;
 }
 
 /**
@@ -29,6 +36,8 @@ export interface SourceFileOptions {
  */
 export interface SourceFileFromTsOptions {
   sourceFile: ts.SourceFile;
+  registry?: SourceFileRegistry;
+  autoRegister?: boolean;
 }
 
 /**
@@ -63,11 +72,14 @@ export type {
 class FileBuilder implements BuildableAST {
   #sourceFile: ts.SourceFile;
   #statements: ts.NodeArray<ts.Statement>;
+  #registry?: SourceFileRegistry;
+  #originalPath?: string; // Track original file path for import rewriting
 
   constructor(options: SourceFileOptions | SourceFileFromTsOptions) {
     if ("sourceFile" in options) {
       // Create from existing SourceFile
       this.#sourceFile = options.sourceFile;
+      this.#originalPath = options.sourceFile.fileName;
     } else {
       // Create a source file from content string
       this.#sourceFile = ts.createSourceFile(
@@ -76,10 +88,17 @@ class FileBuilder implements BuildableAST {
         options.scriptTarget ?? ts.ScriptTarget.Latest,
         true, // setParentNodes
       );
+      this.#originalPath = options.fileName;
     }
 
     // Get the statements from the source file
     this.#statements = this.#sourceFile.statements;
+
+    // Store registry reference and auto-register if requested
+    this.#registry = options.registry;
+    if (options.autoRegister && this.#registry) {
+      this.#registry.register(this as any, this.#originalPath);
+    }
   }
 
   // Methods for adding statements
@@ -963,6 +982,230 @@ class FileBuilder implements BuildableAST {
     return this;
   }
 
+  /**
+   * Rewrite relative imports when moving file from one directory to another
+   * @param fromDir The original directory path
+   * @param toDir The target directory path
+   */
+  rewriteRelativeImports(fromDir: string, toDir: string): this {
+    const originalFileName = this.#originalPath || this.#sourceFile.fileName;
+
+    // Calculate the original full path and new full path
+    const fileName = originalFileName.split(/[\/\\]/).pop() || originalFileName;
+    const originalPath = `${fromDir}/${fileName}`.replace(/[\/\\]+/g, "/");
+    const newPath = `${toDir}/${fileName}`.replace(/[\/\\]+/g, "/");
+
+    return this.rewriteRelativeImportsFullPath(originalPath, newPath);
+  }
+
+  /**
+   * Rewrite relative imports when moving file from one full path to another
+   * @param fromPath The original file path
+   * @param toPath The target file path
+   */
+  rewriteRelativeImportsFullPath(fromPath: string, toPath: string): this {
+    this.updateImports((importDecl) => {
+      const moduleSpecifier = getImportModuleSpecifier(importDecl);
+
+      if (isRelativeImport(moduleSpecifier)) {
+        const newModuleSpecifier = calculateNewImportPath(moduleSpecifier, fromPath, toPath);
+
+        return ts.factory.updateImportDeclaration(
+          importDecl,
+          importDecl.modifiers,
+          importDecl.importClause,
+          ts.factory.createStringLiteral(newModuleSpecifier),
+          importDecl.attributes,
+        );
+      }
+
+      return importDecl;
+    });
+
+    // Update the tracked original path
+    this.#originalPath = toPath;
+
+    // Update registry if present
+    if (this.#registry) {
+      this.#registry.updateFilePath(this.#sourceFile.fileName, toPath);
+    }
+
+    return this;
+  }
+
+  /**
+   * Add or update an import in the source file
+   * If an import from the same module already exists, it will be merged
+   * @param options Import configuration
+   * @param position Position to insert the import ('start' | 'end' | number)
+   */
+  addOrUpdateImport(options: ImportOptions, position: 'start' | 'end' | number = 'start'): this {
+    // Check if import from this module already exists
+    const existingImportIndex = this.#statements.findIndex((stmt) => {
+      if (ts.isImportDeclaration(stmt)) {
+        const moduleSpecifier = getImportModuleSpecifier(stmt);
+        return moduleSpecifier === options.moduleSpecifier;
+      }
+      return false;
+    });
+
+    if (existingImportIndex !== -1) {
+      // Update existing import
+      const existingImport = this.#statements[existingImportIndex] as ts.ImportDeclaration;
+      const updatedImport = mergeImportDeclarations(existingImport, options);
+
+      const newStatements = [...this.#statements];
+      newStatements[existingImportIndex] = updatedImport;
+
+      this.#sourceFile = ts.factory.updateSourceFile(
+        this.#sourceFile,
+        newStatements,
+        this.#sourceFile.isDeclarationFile,
+        this.#sourceFile.referencedFiles,
+        this.#sourceFile.typeReferenceDirectives,
+        this.#sourceFile.hasNoDefaultLib,
+        this.#sourceFile.libReferenceDirectives,
+      );
+    } else {
+      // Add new import
+      const newImport = imp(options).get();
+
+      if (position === 'start') {
+        this.prependStatement(newImport);
+      } else if (position === 'end') {
+        this.addStatement(newImport);
+      } else {
+        // Insert at specific position
+        const newStatements = [...this.#statements];
+        newStatements.splice(position, 0, newImport);
+
+        this.#sourceFile = ts.factory.updateSourceFile(
+          this.#sourceFile,
+          newStatements,
+          this.#sourceFile.isDeclarationFile,
+          this.#sourceFile.referencedFiles,
+          this.#sourceFile.typeReferenceDirectives,
+          this.#sourceFile.hasNoDefaultLib,
+          this.#sourceFile.libReferenceDirectives,
+        );
+      }
+    }
+
+    // Update statements reference
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Remove an import by module specifier
+   * @param moduleSpecifier The module to remove imports for
+   */
+  removeImport(moduleSpecifier: string): this {
+    const newStatements = this.#statements.filter((stmt) => {
+      if (ts.isImportDeclaration(stmt)) {
+        const stmtModuleSpecifier = getImportModuleSpecifier(stmt);
+        return stmtModuleSpecifier !== moduleSpecifier;
+      }
+      return true;
+    });
+
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      newStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Remove specific named imports from a module
+   * @param moduleSpecifier The module to remove imports from
+   * @param namedImports Array of named import names to remove
+   */
+  removeNamedImports(moduleSpecifier: string, namedImports: string[]): this {
+    const newStatements = this.#statements.map((stmt) => {
+      if (ts.isImportDeclaration(stmt)) {
+        const stmtModuleSpecifier = getImportModuleSpecifier(stmt);
+
+        if (stmtModuleSpecifier === moduleSpecifier && stmt.importClause?.namedBindings) {
+          const namedBindings = stmt.importClause.namedBindings;
+
+          if (ts.isNamedImports(namedBindings)) {
+            // Filter out the specified named imports
+            const remainingElements = namedBindings.elements.filter(
+              (element) => !namedImports.includes(element.name.text)
+            );
+
+            // If no elements remain and no default import, remove the entire import
+            if (remainingElements.length === 0 && !stmt.importClause.name) {
+              return null; // Mark for removal
+            }
+
+            // Update with remaining elements
+            const updatedNamedBindings = ts.factory.updateNamedImports(
+              namedBindings,
+              remainingElements
+            );
+
+            const updatedClause = ts.factory.updateImportClause(
+              stmt.importClause,
+              stmt.importClause.isTypeOnly,
+              stmt.importClause.name,
+              updatedNamedBindings
+            );
+
+            return ts.factory.updateImportDeclaration(
+              stmt,
+              stmt.modifiers,
+              updatedClause,
+              stmt.moduleSpecifier,
+              stmt.attributes,
+            );
+          }
+        }
+      }
+
+      return stmt;
+    }).filter((stmt): stmt is ts.Statement => stmt !== null);
+
+    this.#sourceFile = ts.factory.updateSourceFile(
+      this.#sourceFile,
+      newStatements,
+      this.#sourceFile.isDeclarationFile,
+      this.#sourceFile.referencedFiles,
+      this.#sourceFile.typeReferenceDirectives,
+      this.#sourceFile.hasNoDefaultLib,
+      this.#sourceFile.libReferenceDirectives,
+    );
+
+    this.#statements = this.#sourceFile.statements;
+    return this;
+  }
+
+  /**
+   * Get the registry associated with this file
+   */
+  getRegistry(): SourceFileRegistry | undefined {
+    return this.#registry;
+  }
+
+  /**
+   * Set or update the registry for this file
+   */
+  setRegistry(registry: SourceFileRegistry, autoRegister: boolean = true): this {
+    this.#registry = registry;
+    if (autoRegister) {
+      registry.register(this as any, this.#originalPath);
+    }
+    return this;
+  }
+
   get(): ts.SourceFile {
     return this.#sourceFile;
   }
@@ -973,20 +1216,40 @@ class FileBuilder implements BuildableAST {
  *
  * @param fileName The name of the source file
  * @param content Initial content (defaults to empty string)
- * @param scriptTarget The TypeScript script target (defaults to Latest)
+ * @param scriptTargetOrOptions The TypeScript script target or full options object
  * @returns A fluent builder for the source file
  */
-export const file = (
+export function file(
   fileName: string,
+  content?: string,
+  scriptTargetOrOptions?: ts.ScriptTarget | { registry?: SourceFileRegistry; autoRegister?: boolean; scriptTarget?: ts.ScriptTarget }
+): FileBuilder & ts.SourceFile;
+export function file(
+  options: SourceFileOptions
+): FileBuilder & ts.SourceFile;
+export function file(
+  fileNameOrOptions: string | SourceFileOptions,
   content: string = "",
-  scriptTarget: ts.ScriptTarget = ts.ScriptTarget.Latest,
-) => {
-  return buildFluentApi(FileBuilder, {
-    fileName,
-    content,
-    scriptTarget,
-  });
-};
+  scriptTargetOrOptions: ts.ScriptTarget | { registry?: SourceFileRegistry; autoRegister?: boolean; scriptTarget?: ts.ScriptTarget } = ts.ScriptTarget.Latest,
+) {
+  if (typeof fileNameOrOptions === 'string') {
+    // Legacy signature: file(fileName, content?, scriptTarget?)
+    const options: SourceFileOptions = {
+      fileName: fileNameOrOptions,
+      content,
+      scriptTarget: typeof scriptTargetOrOptions === 'number'
+        ? scriptTargetOrOptions
+        : scriptTargetOrOptions?.scriptTarget ?? ts.ScriptTarget.Latest,
+      registry: typeof scriptTargetOrOptions === 'object' ? scriptTargetOrOptions.registry : undefined,
+      autoRegister: typeof scriptTargetOrOptions === 'object' ? scriptTargetOrOptions.autoRegister : undefined,
+    };
+
+    return buildFluentApi(FileBuilder, options);
+  } else {
+    // New signature: file(options)
+    return buildFluentApi(FileBuilder, fileNameOrOptions);
+  }
+}
 
 /**
  * Creates a source file from existing file content string
@@ -994,14 +1257,24 @@ export const file = (
  * @param fileName The name of the source file
  * @param content The TypeScript code content
  * @param scriptTarget The TypeScript script target (defaults to Latest)
+ * @param registry Optional registry for auto-registration
+ * @param autoRegister Whether to auto-register with the registry
  * @returns A fluent builder for the source file
  */
 export const fileFromString = (
   fileName: string,
   content: string,
   scriptTarget: ts.ScriptTarget = ts.ScriptTarget.Latest,
+  registry?: SourceFileRegistry,
+  autoRegister: boolean = true,
 ) => {
-  return file(fileName, content, scriptTarget);
+  return file({
+    fileName,
+    content,
+    scriptTarget,
+    registry,
+    autoRegister: registry ? autoRegister : false,
+  });
 };
 
 /**
@@ -1009,11 +1282,15 @@ export const fileFromString = (
  *
  * @param filePath The path to the TypeScript file to read
  * @param scriptTarget The TypeScript script target (defaults to Latest)
+ * @param registry Optional registry for auto-registration
+ * @param autoRegister Whether to auto-register with the registry
  * @returns A fluent builder for the source file
  */
 export const fileFromPath = (
   filePath: string,
   scriptTarget: ts.ScriptTarget = ts.ScriptTarget.Latest,
+  registry?: SourceFileRegistry,
+  autoRegister: boolean = true,
 ) => {
   // Read from disk
   let content: string;
@@ -1024,18 +1301,26 @@ export const fileFromPath = (
     throw new Error(`Failed to read file at ${filePath}: ${error}`);
   }
 
-  // Get the filename from the path
-  const fileName = filePath.split(/[/\\]/).pop() || filePath;
-
-  return fileFromString(fileName, content, scriptTarget);
+  // Use the full filePath as fileName for better tracking
+  return fileFromString(filePath, content, scriptTarget, registry, autoRegister);
 };
 
 /**
  * Creates a source file from an existing TypeScript SourceFile
  *
  * @param sourceFile The existing TypeScript SourceFile to wrap
+ * @param registry Optional registry for auto-registration
+ * @param autoRegister Whether to auto-register with the registry
  * @returns A fluent builder for the source file
  */
-export const fileFromSourceFile = (sourceFile: ts.SourceFile) => {
-  return buildFluentApi(FileBuilder, { sourceFile });
+export const fileFromSourceFile = (
+  sourceFile: ts.SourceFile,
+  registry?: SourceFileRegistry,
+  autoRegister: boolean = true,
+) => {
+  return buildFluentApi(FileBuilder, {
+    sourceFile,
+    registry,
+    autoRegister: registry ? autoRegister : false,
+  });
 };

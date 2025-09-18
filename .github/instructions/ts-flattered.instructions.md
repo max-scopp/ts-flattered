@@ -239,8 +239,8 @@ export const prop = (
 
 **Alternative overloaded signatures (recommended):**
 ```ts
-export function prop(name: string, type?: ts.TypeNode, optional?: boolean): ReturnType<typeof buildFluentApi>;
-export function prop(existingProperty: ts.PropertyDeclaration): ReturnType<typeof buildFluentApi>;
+export function prop(name: string, type?: ts.TypeNode, optional?: boolean): PropBuilder & ts.PropertyDeclaration;
+export function prop(existingProperty: ts.PropertyDeclaration): PropBuilder & ts.PropertyDeclaration;
 export function prop(
   nameOrProperty: string | ts.PropertyDeclaration, 
   type?: ts.TypeNode, 

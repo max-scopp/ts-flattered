@@ -219,3 +219,114 @@ class ImportBuilder implements BuildableAST {
 
 export const imp = (options: ImportOptions) =>
   buildFluentApi(ImportBuilder, options);
+
+/**
+ * Merges two import declarations from the same module
+ * @param existing The existing import declaration
+ * @param newOptions The new import options to merge
+ * @returns A new merged import declaration
+ */
+export function mergeImportDeclarations(
+  existing: ts.ImportDeclaration,
+  newOptions: ImportOptions,
+): ts.ImportDeclaration {
+  const existingClause = existing.importClause;
+  const existingModuleSpecifier = existing.moduleSpecifier;
+
+  // Start with existing elements
+  const existingNamedImports: string[] = [];
+  const existingTypeOnlyImports: string[] = [];
+  let existingDefaultImport: string | undefined;
+  let existingNamespaceImport: string | undefined;
+
+  // Extract existing imports
+  if (existingClause) {
+    if (existingClause.name) {
+      existingDefaultImport = existingClause.name.text;
+    }
+
+    if (existingClause.namedBindings) {
+      if (ts.isNamespaceImport(existingClause.namedBindings)) {
+        existingNamespaceImport = existingClause.namedBindings.name.text;
+      } else if (ts.isNamedImports(existingClause.namedBindings)) {
+        for (const element of existingClause.namedBindings.elements) {
+          const importName = element.name.text;
+          if (element.isTypeOnly) {
+            existingTypeOnlyImports.push(importName);
+          } else {
+            existingNamedImports.push(importName);
+          }
+        }
+      }
+    }
+  }
+
+  // Merge with new options
+  const mergedOptions: ImportOptions = {
+    moduleSpecifier: newOptions.moduleSpecifier,
+    defaultImport: newOptions.defaultImport || existingDefaultImport,
+    namespaceImport: newOptions.namespaceImport || existingNamespaceImport,
+    namedImports: [
+      ...existingNamedImports,
+      ...(newOptions.namedImports || []),
+    ].filter((item, index, arr) => arr.indexOf(item) === index), // Remove duplicates
+    typeOnlyNamedImports: [
+      ...existingTypeOnlyImports,
+      ...(newOptions.typeOnlyNamedImports || []),
+    ].filter((item, index, arr) => arr.indexOf(item) === index), // Remove duplicates
+    isDefaultTypeOnly: newOptions.isDefaultTypeOnly,
+  };
+
+  // Create new import with merged options
+  return new ImportBuilder(mergedOptions).get();
+}
+
+/**
+ * Extracts import options from an existing import declaration
+ * @param importDecl The import declaration to extract from
+ * @returns ImportOptions representing the declaration
+ */
+export function extractImportOptions(importDecl: ts.ImportDeclaration): ImportOptions {
+  const options: ImportOptions = {
+    moduleSpecifier: ts.isStringLiteral(importDecl.moduleSpecifier)
+      ? importDecl.moduleSpecifier.text
+      : "",
+  };
+
+  const clause = importDecl.importClause;
+  if (!clause) return options;
+
+  // Default import
+  if (clause.name) {
+    options.defaultImport = clause.name.text;
+    options.isDefaultTypeOnly = clause.isTypeOnly;
+  }
+
+  // Named bindings
+  if (clause.namedBindings) {
+    if (ts.isNamespaceImport(clause.namedBindings)) {
+      options.namespaceImport = clause.namedBindings.name.text;
+    } else if (ts.isNamedImports(clause.namedBindings)) {
+      const namedImports: string[] = [];
+      const typeOnlyNamedImports: string[] = [];
+
+      for (const element of clause.namedBindings.elements) {
+        const importName = element.name.text;
+        if (element.isTypeOnly) {
+          typeOnlyNamedImports.push(importName);
+        } else {
+          namedImports.push(importName);
+        }
+      }
+
+      if (namedImports.length > 0) {
+        options.namedImports = namedImports;
+      }
+      if (typeOnlyNamedImports.length > 0) {
+        options.typeOnlyNamedImports = typeOnlyNamedImports;
+      }
+    }
+  }
+
+  return options;
+}

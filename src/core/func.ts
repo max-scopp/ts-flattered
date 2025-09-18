@@ -586,8 +586,8 @@ export function func(
   name: string,
   params?: ts.ParameterDeclaration[],
   body?: ts.Block
-): ReturnType<typeof buildFluentApi>;
-export function func(existingFunction: ts.FunctionDeclaration): ReturnType<typeof buildFluentApi>;
+): FunctionBuilder & ts.FunctionDeclaration;
+export function func(existingFunction: ts.FunctionDeclaration): FunctionBuilder & ts.FunctionDeclaration;
 export function func(
   nameOrFunction: string | ts.FunctionDeclaration,
   params: ts.ParameterDeclaration[] = [],
