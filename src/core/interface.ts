@@ -14,8 +14,8 @@ class InterfaceBuilder implements BuildableAST {
     typeParams,
     heritage,
   }: {
-    name: string;
-    members?: ts.TypeElement[];
+    name: string | ts.Identifier;
+    members?: readonly ts.TypeElement[];
     mods?: ts.ModifierLike[];
     typeParams?: ts.TypeParameterDeclaration[];
     heritage?: ts.HeritageClause[];
@@ -24,8 +24,8 @@ class InterfaceBuilder implements BuildableAST {
   constructor(
     optionsOrFrom:
       | {
-          name: string;
-          members?: ts.TypeElement[];
+          name: string | ts.Identifier;
+          members?: readonly ts.TypeElement[];
           mods?: ts.ModifierLike[];
           typeParams?: ts.TypeParameterDeclaration[];
           heritage?: ts.HeritageClause[];
@@ -37,12 +37,16 @@ class InterfaceBuilder implements BuildableAST {
       this.#decl = optionsOrFrom;
     } else {
       // Creating new node from options
+      const nameNode = typeof optionsOrFrom.name === 'string'
+        ? ts.factory.createIdentifier(optionsOrFrom.name)
+        : optionsOrFrom.name;
+
       this.#decl = ts.factory.createInterfaceDeclaration(
         optionsOrFrom.mods,
-        ts.factory.createIdentifier(optionsOrFrom.name),
+        nameNode,
         optionsOrFrom.typeParams,
         optionsOrFrom.heritage,
-        optionsOrFrom.members ?? [],
+        ts.factory.createNodeArray(optionsOrFrom.members ?? []),
       );
     }
   }
@@ -102,9 +106,22 @@ class InterfaceBuilder implements BuildableAST {
     return this;
   }
 
-  // Add property
+  /**
+   * Add a property to the interface
+   * @example
+   * ```ts
+   * // Simple property
+   * addProperty('myProp', stringType);
+   *
+   * // String literal property
+   * addProperty(ts.factory.createStringLiteral('my-prop'), stringType);
+   *
+   * // Computed property
+   * addProperty(ts.factory.createComputedPropertyName(expr), stringType);
+   * ```
+   */
   addProperty(
-    name: string,
+    name: string | ts.PropertyName,
     type: ts.TypeNode,
     optional = false,
     readonly = false,
@@ -116,9 +133,13 @@ class InterfaceBuilder implements BuildableAST {
       ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
       : undefined;
 
+    const propertyName = typeof name === 'string'
+      ? ts.factory.createIdentifier(name)
+      : name;
+
     const property = ts.factory.createPropertySignature(
       modifiers,
-      ts.factory.createIdentifier(name),
+      propertyName,
       questionToken,
       type,
     );
@@ -134,9 +155,22 @@ class InterfaceBuilder implements BuildableAST {
     return this;
   }
 
-  // Add method signature
+  /**
+   * Add a method signature to the interface
+   * @example
+   * ```ts
+   * // Simple method
+   * addMethod('myMethod', params, returnType);
+   *
+   * // String literal method
+   * addMethod(ts.factory.createStringLiteral('my-method'), params, returnType);
+   *
+   * // Computed method name
+   * addMethod(ts.factory.createComputedPropertyName(expr), params, returnType);
+   * ```
+   */
   addMethod(
-    name: string,
+    name: string | ts.PropertyName,
     parameters: ts.ParameterDeclaration[],
     returnType?: ts.TypeNode,
     optional = false,
@@ -145,9 +179,13 @@ class InterfaceBuilder implements BuildableAST {
       ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
       : undefined;
 
+    const methodName = typeof name === 'string'
+      ? ts.factory.createIdentifier(name)
+      : name;
+
     const method = ts.factory.createMethodSignature(
       undefined, // modifiers
-      ts.factory.createIdentifier(name),
+      methodName,
       questionToken,
       undefined, // type parameters
       parameters,
@@ -303,19 +341,32 @@ class InterfaceBuilder implements BuildableAST {
  * @param mods Optional modifiers
  */
 export function interface_(
-  name: string,
+  name: string | ts.Identifier,
   members?: ts.TypeElement[],
-  mods?: ts.ModifierLike[]
+  mods?: ts.ModifierLike[],
 ): InterfaceBuilder & ts.InterfaceDeclaration;
 export function interface_(existingInterface: ts.InterfaceDeclaration): InterfaceBuilder & ts.InterfaceDeclaration;
 export function interface_(
-  nameOrInterface: string | ts.InterfaceDeclaration,
+  nameOrInterface: string | ts.Identifier | ts.InterfaceDeclaration,
   members: ts.TypeElement[] = [],
   mods?: ts.ModifierLike[],
 ) {
-  if (typeof nameOrInterface === "string") {
-    return buildFluentApi(InterfaceBuilder, { name: nameOrInterface, members, mods });
-  } else {
+  if (nameOrInterface instanceof Object && "kind" in nameOrInterface && nameOrInterface.kind === ts.SyntaxKind.InterfaceDeclaration) {
     return buildFluentApi(InterfaceBuilder, nameOrInterface);
+  } else {
+    const nameNode = typeof nameOrInterface === 'string'
+      ? ts.factory.createIdentifier(nameOrInterface)
+      : nameOrInterface;
+
+    // Create interface declaration
+    const decl = ts.factory.createInterfaceDeclaration(
+      mods,
+      nameNode,
+      undefined,
+      undefined,
+      ts.factory.createNodeArray(members),
+    );
+
+    return buildFluentApi(InterfaceBuilder, decl);
   }
 }

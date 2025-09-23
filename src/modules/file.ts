@@ -69,7 +69,7 @@ export type {
 /**
  * Builder for a TypeScript source file
  */
-class FileBuilder implements BuildableAST {
+export class FileBuilder implements BuildableAST {
   #sourceFile: ts.SourceFile;
   #statements: ts.NodeArray<ts.Statement>;
   #registry?: SourceFileRegistry;
@@ -470,14 +470,38 @@ class FileBuilder implements BuildableAST {
   }
 
   /**
-   * Updates existing import declarations in the source file using a callback function
+   * Updates existing import declarations in the source file using a callback function.
+   * Provides helpers for updating module specifiers and creates proper AST nodes.
+   * @example
+   * ```ts
+   * file.updateImports((importDecl) => {
+   *   const moduleSpecifier = getImportModuleSpecifier(importDecl);
+   *   if (moduleSpecifier === "@stencil/core") {
+   *     return ts.factory.updateImportDeclaration(
+   *       importDecl,
+   *       importDecl.modifiers,
+   *       importDecl.importClause,
+   *       ts.factory.createStringLiteral("@pencel/runtime"),
+   *       importDecl.attributes
+   *     );
+   *   }
+   *   return importDecl;
+   * });
+   * ```
    */
   updateImports(
     updateFn: (statement: ts.ImportDeclaration) => ts.ImportDeclaration,
   ) {
     const updatedStatements = this.#statements.map((statement) => {
       if (ts.isImportDeclaration(statement)) {
-        return updateFn(statement);
+        const updated = updateFn(statement);
+
+        // Ensure the module specifier is a string literal
+        if (!ts.isStringLiteral(updated.moduleSpecifier)) {
+          throw new Error('Module specifier must be a string literal');
+        }
+
+        return updated;
       }
       return statement;
     });
@@ -488,6 +512,29 @@ class FileBuilder implements BuildableAST {
     // Update statements reference
     this.#statements = this.#sourceFile.statements;
     return this;
+  }
+
+  /**
+   * Helper to get the module specifier string from an import declaration
+   */
+  getImportModuleSpecifier(importDecl: ts.ImportDeclaration): string {
+    return (importDecl.moduleSpecifier as ts.StringLiteral).text;
+  }
+
+  /**
+   * Helper to create an updated import declaration with a new module specifier
+   */
+  updateImportModuleSpecifier(
+    importDecl: ts.ImportDeclaration,
+    newModuleSpecifier: string,
+  ): ts.ImportDeclaration {
+    return ts.factory.updateImportDeclaration(
+      importDecl,
+      importDecl.modifiers,
+      importDecl.importClause,
+      ts.factory.createStringLiteral(newModuleSpecifier),
+      importDecl.attributes,
+    );
   }
 
   /**

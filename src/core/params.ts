@@ -473,9 +473,54 @@ class ParamsBuilder implements BuildableAST {
   }
 }
 
-export const param = (
+interface ParamOptions {
+  type?: ts.TypeNode;
+  optional?: boolean;
+  initializer?: ts.Expression;
+}
+
+/**
+ * Create a parameter declaration with a flexible API
+ * @example
+ * ```ts
+ * // Using positional arguments
+ * param('myParam', stringType, true);
+ *
+ * // Using options object
+ * param('myParam', {
+ *   type: stringType,
+ *   optional: true,
+ *   initializer: ts.factory.createStringLiteral('default')
+ * });
+ *
+ * // Only setting initializer
+ * param('myParam', { initializer: defaultValue });
+ * ```
+ */
+export function param(name: string, type?: ts.TypeNode, optional?: boolean, initializer?: ts.Expression): ParamsBuilder & ts.ParameterDeclaration;
+export function param(name: string, options?: ParamOptions): ParamsBuilder & ts.ParameterDeclaration;
+export function param(
   name: string,
-  type?: ts.TypeNode,
+  typeOrOptions?: ts.TypeNode | ParamOptions,
   optional?: boolean,
   initializer?: ts.Expression,
-) => buildFluentApi(ParamsBuilder, { name, type, optional, initializer });
+): ParamsBuilder & ts.ParameterDeclaration {
+  // Handle options object style
+  if (typeOrOptions && typeof typeOrOptions === 'object' && !('kind' in typeOrOptions)) {
+    const options = typeOrOptions as ParamOptions;
+    return buildFluentApi(ParamsBuilder, {
+      name,
+      type: options.type,
+      optional: options.optional,
+      initializer: options.initializer
+    });
+  }
+
+  // Handle positional arguments style
+  return buildFluentApi(ParamsBuilder, {
+    name,
+    type: typeOrOptions as ts.TypeNode | undefined,
+    optional,
+    initializer
+  });
+}

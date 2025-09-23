@@ -146,6 +146,130 @@ export class KlassBuilder implements BuildableAST {
     return this;
   }
 
+  // ========== Heritage Methods ==========
+
+  /**
+   * Get the heritage clause of a specific kind (extends or implements)
+   * @param kind The heritage clause kind (extends or implements)
+   * @returns The heritage clause if it exists, undefined otherwise
+   */
+  getHeritageClause(kind: ts.SyntaxKind.ExtendsKeyword | ts.SyntaxKind.ImplementsKeyword): ts.HeritageClause | undefined {
+    return this.#decl.heritageClauses?.find(clause => clause.token === kind);
+  }
+
+  /**
+   * Set the class to extend a specific type
+   * @param type The type expression to extend
+   */
+  setExtends(type: ts.Expression | string) {
+    const expression = typeof type === 'string'
+      ? ts.factory.createIdentifier(type)
+      : type;
+
+    const extendsClause = ts.factory.createHeritageClause(
+      ts.SyntaxKind.ExtendsKeyword,
+      [ts.factory.createExpressionWithTypeArguments(expression, [])]
+    );
+
+    // Filter out any existing extends clause
+    const otherClauses = this.#decl.heritageClauses?.filter(
+      clause => clause.token !== ts.SyntaxKind.ExtendsKeyword
+    ) || [];
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      [extendsClause, ...otherClauses],
+      this.#decl.members,
+    );
+    return this;
+  }
+
+  /**
+   * Set the interfaces that this class implements
+   * @param interfaces Array of interface names or type nodes to implement
+   */
+  setImplements(interfaces: (ts.Expression | string)[]) {
+    const expressions = interfaces.map(iface =>
+      typeof iface === 'string'
+        ? ts.factory.createExpressionWithTypeArguments(ts.factory.createIdentifier(iface), [])
+        : ts.factory.createExpressionWithTypeArguments(iface, [])
+    );
+
+    const implementsClause = ts.factory.createHeritageClause(
+      ts.SyntaxKind.ImplementsKeyword,
+      expressions
+    );
+
+    // Filter out any existing implements clause
+    const otherClauses = this.#decl.heritageClauses?.filter(
+      clause => clause.token !== ts.SyntaxKind.ImplementsKeyword
+    ) || [];
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      [...otherClauses, implementsClause],
+      this.#decl.members,
+    );
+    return this;
+  }
+
+  /**
+   * Add additional interfaces to implement
+   * @param interfaces Array of interface names or type nodes to implement
+   */
+  addImplements(interfaces: (ts.Expression | string)[]) {
+    const existingImplements = this.getHeritageClause(ts.SyntaxKind.ImplementsKeyword);
+    const existingTypes = existingImplements?.types || [];
+
+    const newExpressions = interfaces.map(iface =>
+      typeof iface === 'string'
+        ? ts.factory.createExpressionWithTypeArguments(ts.factory.createIdentifier(iface), [])
+        : ts.factory.createExpressionWithTypeArguments(iface, [])
+    );
+
+    const implementsClause = ts.factory.createHeritageClause(
+      ts.SyntaxKind.ImplementsKeyword,
+      [...existingTypes, ...newExpressions]
+    );
+
+    // Filter out any existing implements clause
+    const otherClauses = this.#decl.heritageClauses?.filter(
+      clause => clause.token !== ts.SyntaxKind.ImplementsKeyword
+    ) || [];
+
+    this.#decl = ts.factory.updateClassDeclaration(
+      this.#decl,
+      this.#decl.modifiers,
+      this.#decl.name,
+      this.#decl.typeParameters,
+      [...otherClauses, implementsClause],
+      this.#decl.members,
+    );
+    return this;
+  }
+
+  /**
+   * Check if the class implements a specific interface
+   * @param interfaceName The name of the interface to check
+   */
+  hasImplements(interfaceName: string): boolean {
+    const implementsClause = this.getHeritageClause(ts.SyntaxKind.ImplementsKeyword);
+    if (!implementsClause) return false;
+
+    return implementsClause.types.some(type => {
+      if (ts.isExpressionWithTypeArguments(type) && ts.isIdentifier(type.expression)) {
+        return type.expression.text === interfaceName;
+      }
+      return false;
+    });
+  }
+
   /**
    * Get the class name as a string - bypasses all proxy issues
    */
